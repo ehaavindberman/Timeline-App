@@ -1,244 +1,257 @@
-import React, { useEffect, useState } from 'react';
-import { useTimelineStore } from '../../store/timelineStore';
-import { ZoomLevel } from './TimelineCanvas';
+"use client"
+
+import type React from "react"
+import { useEffect, useState } from "react"
+import { useTimelineStore } from "../../store/timelineStore"
+import type { ZoomLevel } from "./TimelineCanvas"
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react"
+
 type TimelineSpanProps = {
   span: {
-    id: string;
-    title: string;
-    startDate: string;
-    endDate: string;
-    x: number;
-    width: number;
-    color: string;
-  };
-  calculateDatePosition: (date: Date) => number;
-  zoomLevel: ZoomLevel;
-};
-export const TimelineSpan = ({
-  span,
-  calculateDatePosition,
-  zoomLevel
-}: TimelineSpanProps) => {
-  const {
-    updateSpan,
-    selectElement,
-    selectedElementId
-  } = useTimelineStore();
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeDirection, setResizeDirection] = useState<'left' | 'right' | null>(null);
-  const [startX, setStartX] = useState(0);
-  const [startWidth, setStartWidth] = useState(span.width);
-  const [startPosition, setStartPosition] = useState(span.x);
+    id: string
+    title: string
+    description: string
+    startDate: string
+    endDate: string
+    x: number
+    y: number
+    width: number
+    color: string
+  }
+  calculateDatePosition: (date: Date) => number
+  zoomLevel: ZoomLevel
+}
+
+export const TimelineSpan = ({ span, calculateDatePosition, zoomLevel }: TimelineSpanProps) => {
+  const { updateSpan, selectElement, selectedElementId } = useTimelineStore()
+  const [isDragging, setIsDragging] = useState(false)
+  const [isResizing, setIsResizing] = useState(false)
+  const [isDateLocked, setIsDateLocked] = useState(false)
+  const [showDescription, setShowDescription] = useState(false)
+  const [resizeDirection, setResizeDirection] = useState<"left" | "right" | null>(null)
+  const [startX, setStartX] = useState(0)
+  const [startY, setStartY] = useState(0)
+  const [startWidth, setStartWidth] = useState(span.width)
+  const [startPosition, setStartPosition] = useState(span.x)
   const [position, setPosition] = useState({
     x: span.x,
-    y: 200
-  });
-  const [width, setWidth] = useState(span.width);
-  const [isEditing, setIsEditing] = useState(false);
-  const [title, setTitle] = useState(span.title);
+    y: span.y,
+  })
+  const [width, setWidth] = useState(span.width)
+
   // Update position and width based on dates when zoom level changes
   useEffect(() => {
-    const startDate = new Date(span.startDate);
-    const endDate = new Date(span.endDate);
-    const xPos = calculateDatePosition(startDate);
-    const endPos = calculateDatePosition(endDate);
-    const newWidth = endPos - xPos;
-    setPosition(prev => ({
+    const startDate = new Date(span.startDate)
+    const endDate = new Date(span.endDate)
+    const xPos = calculateDatePosition(startDate)
+    const endPos = calculateDatePosition(endDate)
+    const newWidth = endPos - xPos
+
+    setPosition((prev) => ({
+      x: xPos,
+      y: prev.y, // Keep the y position unchanged
+    }))
+    setWidth(newWidth > 0 ? newWidth : 100)
+  }, [span.startDate, span.endDate, zoomLevel, calculateDatePosition])
+
+  // Update y position when span.y changes
+  useEffect(() => {
+    setPosition((prev) => ({
       ...prev,
-      x: xPos
-    }));
-    setWidth(newWidth > 0 ? newWidth : 100); // Ensure minimum width
-  }, [span.startDate, span.endDate, zoomLevel, calculateDatePosition]);
+      y: span.y,
+    }))
+  }, [span.y])
+
   const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsDragging(true);
-    setStartX(e.clientX);
-    selectElement(span.id);
-  };
-  const handleResizeStart = (e: React.MouseEvent, direction: 'left' | 'right') => {
-    e.stopPropagation();
-    setIsResizing(true);
-    setResizeDirection(direction);
-    setStartX(e.clientX);
-    setStartWidth(width);
-    setStartPosition(position.x);
-    selectElement(span.id);
-  };
+    e.stopPropagation()
+    e.preventDefault() // Prevent text selection
+    setIsDragging(true)
+    setStartX(e.clientX)
+    setStartY(e.clientY)
+    selectElement(span.id)
+
+    // Check if Shift is held to lock the date
+    setIsDateLocked(e.shiftKey)
+  }
+
+  const handleResizeStart = (e: React.MouseEvent, direction: "left" | "right") => {
+    e.stopPropagation()
+    e.preventDefault() // Prevent text selection
+    setIsResizing(true)
+    setResizeDirection(direction)
+    setStartX(e.clientX)
+    setStartWidth(width)
+    setStartPosition(position.x)
+    selectElement(span.id)
+  }
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging) {
-      const deltaX = e.clientX - startX;
-      // Update visual position for smooth dragging
-      const newPosition = {
-        x: position.x + deltaX,
-        y: position.y
-      };
-      setPosition(newPosition);
-      setStartX(e.clientX);
-      // We only update the span data (dates) on mouse up to avoid excessive updates
-      // This fixes the erratic movement issue
+      const deltaX = e.clientX - startX
+      const deltaY = e.clientY - startY
+
+      const newPosition = { ...position }
+
+      // Always allow vertical movement
+      newPosition.y = Math.max(50, position.y + deltaY)
+
+      // Only allow horizontal movement if date is not locked
+      if (!isDateLocked) {
+        newPosition.x = position.x + deltaX
+      }
+
+      setPosition(newPosition)
+      setStartX(e.clientX)
+      setStartY(e.clientY)
     }
     if (isResizing) {
-      const deltaX = e.clientX - startX;
-      if (resizeDirection === 'right') {
-        // Calculate new width - just visual update
-        const newWidth = Math.max(100, startWidth + deltaX);
-        setWidth(newWidth);
-      } else if (resizeDirection === 'left') {
-        // Calculate new width and position - just visual update
-        const newWidth = Math.max(100, startWidth - deltaX);
-        const newX = startPosition + startWidth - newWidth;
-        setWidth(newWidth);
-        setPosition({
+      const deltaX = e.clientX - startX
+      if (resizeDirection === "right") {
+        const newWidth = Math.max(100, startWidth + deltaX)
+        setWidth(newWidth)
+      } else if (resizeDirection === "left") {
+        const newWidth = Math.max(100, startWidth - deltaX)
+        const newX = startPosition + startWidth - newWidth
+        setWidth(newWidth)
+        setPosition((prev) => ({
+          ...prev,
           x: newX,
-          y: position.y
-        });
+        }))
       }
     }
-  };
+  }
+
   const handleMouseUp = () => {
-    // When releasing the mouse, we need to update the actual data
     if (isDragging || isResizing) {
-      // Get the current date from timeline canvas
-      const canvasElement = document.getElementById('timeline-canvas');
-      if (canvasElement) {
-        const rect = canvasElement.getBoundingClientRect();
-        const canvasX = position.x;
-        const canvasEndX = position.x + width;
-        // Use the timeline's functions from the global config
-        const timelineConfig = (window as any).timelineConfig;
-        if (timelineConfig) {
-          // Calculate the new dates based on the position and width
-          let newStartDate = new Date(span.startDate);
-          let newEndDate = new Date(span.endDate);
-          // Try to use the canvas's positionToDate function
-          if (isDragging) {
-            // When dragging, we want to preserve the duration
-            const duration = new Date(span.endDate).getTime() - new Date(span.startDate).getTime();
-            // Calculate new start date based on new position
-            newStartDate = new Date(calculatePositionDate(canvasX));
-            // Calculate new end date by adding the original duration
-            newEndDate = new Date(newStartDate.getTime() + duration);
-          } else if (isResizing) {
-            if (resizeDirection === 'right') {
-              // Only the end date changes
-              newEndDate = new Date(calculatePositionDate(canvasEndX));
-            } else if (resizeDirection === 'left') {
-              // Only the start date changes
-              newStartDate = new Date(calculatePositionDate(canvasX));
+      const timelineConfig = (window as any).timelineConfig
+      if (timelineConfig) {
+        let newStartDate = new Date(span.startDate)
+        let newEndDate = new Date(span.endDate)
+
+        if (isDragging && !isDateLocked) {
+          // When dragging horizontally (and date not locked), preserve the duration
+          const duration = new Date(span.endDate).getTime() - new Date(span.startDate).getTime()
+          if (timelineConfig.positionToDate) {
+            newStartDate = timelineConfig.positionToDate(position.x)
+            newEndDate = new Date(newStartDate.getTime() + duration)
+          }
+        } else if (isResizing) {
+          // When resizing, update the appropriate date
+          if (resizeDirection === "right") {
+            if (timelineConfig.positionToDate) {
+              newEndDate = timelineConfig.positionToDate(position.x + width)
+            }
+          } else if (resizeDirection === "left") {
+            if (timelineConfig.positionToDate) {
+              newStartDate = timelineConfig.positionToDate(position.x)
             }
           }
-          // Update the span with new position, width, and dates
-          updateSpan(span.id, {
-            ...span,
-            x: position.x,
-            width: width,
-            startDate: newStartDate.toISOString(),
-            endDate: newEndDate.toISOString()
-          });
         }
+
+        updateSpan(span.id, {
+          ...span,
+          x: position.x,
+          y: position.y,
+          width: width,
+          startDate: newStartDate.toISOString(),
+          endDate: newEndDate.toISOString(),
+        })
       }
     }
-    setIsDragging(false);
-    setIsResizing(false);
-    setResizeDirection(null);
-  };
-  // Helper function to calculate date from position
-  const calculatePositionDate = (posX: number): Date => {
-    // Use the canvas's calculateDatePosition in reverse if available
-    const timelineConfig = (window as any).timelineConfig;
-    if (timelineConfig && timelineConfig.positionToDate) {
-      return timelineConfig.positionToDate(posX);
-    }
-    // Fallback implementation
-    const segments = document.querySelectorAll('[data-timeline-segment]');
-    let foundDate = new Date();
-    // Find which segment our position is in
-    segments.forEach(segment => {
-      const segmentRect = segment.getBoundingClientRect();
-      const canvasElement = document.getElementById('timeline-canvas');
-      if (!canvasElement) return;
-      const rect = canvasElement.getBoundingClientRect();
-      const segmentLeft = segmentRect.left - rect.left;
-      const segmentRight = segmentRect.right - rect.left;
-      if (posX >= segmentLeft && posX <= segmentRight) {
-        const dateAttr = segment.getAttribute('data-date');
-        if (dateAttr) {
-          foundDate = new Date(dateAttr);
-          // Adjust for position within the segment
-          const segmentWidth = segmentRight - segmentLeft;
-          const posWithinSegment = (posX - segmentLeft) / segmentWidth;
-          if (zoomLevel === ZoomLevel.Days) {
-            const daysToAdd = Math.floor(posWithinSegment * 30); // Approximate
-            foundDate.setDate(foundDate.getDate() + daysToAdd);
-          } else if (zoomLevel === ZoomLevel.Months) {
-            // Position within month
-            const daysToAdd = Math.floor(posWithinSegment * 30); // Approximate
-            foundDate.setDate(foundDate.getDate() + daysToAdd);
-          } else {
-            // Position within year
-            const daysToAdd = Math.floor(posWithinSegment * 365); // Approximate
-            foundDate.setDate(foundDate.getDate() + daysToAdd);
-          }
-        }
-      }
-    });
-    return foundDate;
-  };
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsEditing(true);
-  };
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTitle(e.target.value);
-  };
-  const handleTitleBlur = () => {
-    setIsEditing(false);
-    updateSpan(span.id, {
-      ...span,
-      title
-    });
-  };
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      setIsEditing(false);
-      updateSpan(span.id, {
-        ...span,
-        title
-      });
-    }
-  };
+    setIsDragging(false)
+    setIsResizing(false)
+    setResizeDirection(null)
+    setIsDateLocked(false)
+  }
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    selectElement(span.id)
+  }
+
+  const handleToggleDescription = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setShowDescription(!showDescription)
+  }
+
   useEffect(() => {
     if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleMouseMove as any);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener("mousemove", handleMouseMove as any)
+      document.addEventListener("mouseup", handleMouseUp)
       return () => {
-        document.removeEventListener('mousemove', handleMouseMove as any);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
+        document.removeEventListener("mousemove", handleMouseMove as any)
+        document.removeEventListener("mouseup", handleMouseUp)
+      }
     }
-  }, [isDragging, isResizing, position, width]);
-  const isSelected = selectedElementId === span.id;
-  return <div className={`absolute ${isDragging ? 'cursor-grabbing' : 'cursor-grab'} ${isSelected ? 'z-10' : 'z-0'}`} style={{
-    left: `${position.x}px`,
-    top: `${position.y}px`,
-    width: `${width}px`
-  }} onMouseDown={handleMouseDown} onDoubleClick={handleDoubleClick}>
-      <div className={`rounded-md transition-shadow ${isSelected ? 'shadow-lg ring-2 ring-blue-400' : 'shadow-md'}`} style={{
-      backgroundColor: span.color,
-      opacity: 0.9
-    }}>
+  }, [isDragging, isResizing, position, width, isDateLocked])
+
+  const isSelected = selectedElementId === span.id
+
+  return (
+    <div
+      className={`absolute ${
+        isDragging ? "cursor-grabbing" : isResizing ? "cursor-ew-resize" : "cursor-grab hover:cursor-grab"
+      } ${isSelected ? "z-30" : "z-20"} select-none`}
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${width}px`,
+      }}
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
+      title="Drag to move (hold Shift to lock date)"
+    >
+      <div
+        className={`rounded-md transition-shadow select-none ${isSelected ? "shadow-lg ring-2 ring-blue-400" : "shadow-md"}`}
+        style={{
+          backgroundColor: span.color,
+          opacity: 0.9,
+        }}
+      >
         <div className="px-3 py-2 bg-white rounded-t-md">
-          {isEditing ? <input type="text" value={title} onChange={handleTitleChange} onBlur={handleTitleBlur} onKeyDown={handleKeyDown} className="w-full text-sm font-medium outline-none border-b border-blue-300" autoFocus /> : <h3 className="text-sm font-medium text-slate-800">{span.title}</h3>}
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-slate-800 pointer-events-none select-none flex-1">{span.title}</h3>
+            {span.description && (
+              <button
+                onClick={handleToggleDescription}
+                className="ml-2 p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                title={showDescription ? "Hide description" : "Show description"}
+              >
+                {showDescription ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
+              </button>
+            )}
+          </div>
+          {showDescription && span.description && (
+            <div className="mt-2 pt-2 border-t border-slate-200">
+              <p className="text-xs text-slate-600 pointer-events-none select-none leading-relaxed">
+                {span.description}
+              </p>
+            </div>
+          )}
         </div>
-        <div className="px-3 py-2 text-xs text-white flex justify-between">
+        <div className="px-3 py-2 text-xs text-white flex justify-between pointer-events-none select-none">
           <span>{new Date(span.startDate).toLocaleDateString()}</span>
           <span>to</span>
           <span>{new Date(span.endDate).toLocaleDateString()}</span>
         </div>
       </div>
       {/* Resize handles */}
-      <div className="absolute left-0 top-0 w-2 h-full cursor-ew-resize" onMouseDown={e => handleResizeStart(e, 'left')} />
-      <div className="absolute right-0 top-0 w-2 h-full cursor-ew-resize" onMouseDown={e => handleResizeStart(e, 'right')} />
-    </div>;
-};
+      <div
+        className="absolute left-0 top-0 w-2 h-full cursor-ew-resize z-10"
+        onMouseDown={(e) => handleResizeStart(e, "left")}
+      />
+      <div
+        className="absolute right-0 top-0 w-2 h-full cursor-ew-resize z-10"
+        onMouseDown={(e) => handleResizeStart(e, "right")}
+      />
+      {/* Visual indicator for drag mode */}
+      {isDragging && (
+        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap select-none z-40">
+          {isDateLocked ? "Date locked - moving vertically" : "Moving freely"}
+        </div>
+      )}
+    </div>
+  )
+}
