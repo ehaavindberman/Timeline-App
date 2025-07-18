@@ -14,12 +14,14 @@ import {
   addYears,
   startOfYear,
   endOfYear,
-  addDays,
 } from "date-fns"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 
 // Default reference date for calculations (can be any date)
 export const REFERENCE_DATE = new Date(2023, 0, 1) // Jan 1, 2023
+
+// Default center date for initial view
+const DEFAULT_CENTER_DATE = new Date(2023, 3, 15) // April 15, 2023
 
 // Enum for different zoom levels
 export enum ZoomLevel {
@@ -30,12 +32,13 @@ export enum ZoomLevel {
 
 export const TimelineCanvas = () => {
   const { events, spans, addEvent, selectElement } = useTimelineStore()
-  const [scale, setScale] = useState(100) // pixels per day at the most zoomed in level
+  const [scale, setScale] = useState(5) // Start at year level (5 pixels per day)
   const [position, setPosition] = useState(0) // horizontal scroll position
   const [isDragging, setIsDragging] = useState(false)
   const [startDragX, setStartDragX] = useState(0)
   const [startPosition, setStartPosition] = useState(0)
-  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(ZoomLevel.Days)
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(ZoomLevel.Years) // Start at year level
+  const [isInitialized, setIsInitialized] = useState(false) // Track if initial positioning is done
   const [offscreenElements, setOffscreenElements] = useState<{
     left: {
       id: string
@@ -51,6 +54,26 @@ export const TimelineCanvas = () => {
   })
 
   const canvasRef = useRef<HTMLDivElement>(null)
+
+  // Convert position to date based on reference date
+  const positionToDate = useCallback(
+    (xPos: number): Date => {
+      let dayOffset: number
+
+      if (zoomLevel === ZoomLevel.Days) {
+        dayOffset = xPos / scale
+      } else if (zoomLevel === ZoomLevel.Months) {
+        dayOffset = xPos / (scale / 5)
+      } else {
+        dayOffset = xPos / (scale / 20)
+      }
+
+      // Use more precise date calculation
+      const millisecondsOffset = dayOffset * 24 * 60 * 60 * 1000
+      return new Date(REFERENCE_DATE.getTime() + millisecondsOffset)
+    },
+    [scale, zoomLevel],
+  )
 
   // Determine zoom level based on scale
   const getZoomLevelFromScale = useCallback((currentScale: number): ZoomLevel => {
@@ -70,22 +93,30 @@ export const TimelineCanvas = () => {
   // Calculate the visible date range based on current position and canvas width
   const getVisibleDateRange = useCallback(() => {
     if (!canvasRef.current) {
-      return {
-        startDate: new Date(REFERENCE_DATE.getTime() - 365 * 24 * 60 * 60 * 1000), // 1 year before reference
-        endDate: new Date(REFERENCE_DATE.getTime() + 365 * 24 * 60 * 60 * 1000), // 1 year after reference
-      }
+      // Fallback - calculate based on current position even without canvas
+      const fallbackWidth = 1200 // reasonable default
+      const visibleStartX = -position - fallbackWidth
+      const visibleEndX = -position + fallbackWidth * 2
+
+      const startDate = positionToDate(visibleStartX)
+      const endDate = positionToDate(visibleEndX)
+
+      return { startDate, endDate }
     }
 
     const canvasWidth = canvasRef.current.clientWidth
-    const visibleStartX = -position - canvasWidth // Add buffer for smooth scrolling
-    const visibleEndX = -position + canvasWidth * 2 // Add buffer for smooth scrolling
+    // Calculate the absolute timeline positions that are currently visible
+    // Add extra buffer for smooth scrolling and preloading
+    const buffer = canvasWidth * 1.5 // 1.5x canvas width buffer on each side
+    const visibleStartX = -position - buffer
+    const visibleEndX = -position + canvasWidth + buffer
 
-    // Convert positions to dates
+    // Convert positions to dates using our position-to-date conversion
     const startDate = positionToDate(visibleStartX)
     const endDate = positionToDate(visibleEndX)
 
     return { startDate, endDate }
-  }, [position])
+  }, [position, zoomLevel])
 
   // Generate timeline segments based on visible range
   const generateTimelineSegments = useCallback(
@@ -93,9 +124,11 @@ export const TimelineCanvas = () => {
       const segments = []
 
       if (currentZoomLevel === ZoomLevel.Days) {
-        // Generate months with days
-        let currentDate = startOfMonth(startDate)
-        while (currentDate <= endDate) {
+        // Generate months with days - extend range to ensure coverage
+        let currentDate = startOfMonth(new Date(startDate.getTime() - 31 * 24 * 60 * 60 * 1000)) // Start one month earlier
+        const extendedEndDate = new Date(endDate.getTime() + 31 * 24 * 60 * 60 * 1000) // End one month later
+
+        while (currentDate <= extendedEndDate) {
           const month = currentDate.getMonth()
           const year = currentDate.getFullYear()
           const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -109,9 +142,11 @@ export const TimelineCanvas = () => {
           currentDate = addMonths(currentDate, 1)
         }
       } else if (currentZoomLevel === ZoomLevel.Months) {
-        // Generate years with months
-        let currentDate = startOfYear(startDate)
-        while (currentDate <= endDate) {
+        // Generate years with months - extend range to ensure coverage
+        let currentDate = startOfYear(new Date(startDate.getTime() - 365 * 24 * 60 * 60 * 1000)) // Start one year earlier
+        const extendedEndDate = new Date(endDate.getTime() + 365 * 24 * 60 * 60 * 1000) // End one year later
+
+        while (currentDate <= extendedEndDate) {
           const year = currentDate.getFullYear()
           const yearSegment = {
             label: format(currentDate, "yyyy"),
@@ -125,7 +160,7 @@ export const TimelineCanvas = () => {
             const monthStart = startOfMonth(monthDate)
             const monthEnd = endOfMonth(monthDate)
             const daysInMonth = differenceInDays(monthEnd, monthStart) + 1
-            const monthWidth = daysInMonth * (currentScale / 5) // Adjust scale for months view
+            const monthWidth = daysInMonth * (currentScale / 5)
             yearSegment.months.push({
               label: format(monthDate, "MMM"),
               width: monthWidth,
@@ -137,13 +172,15 @@ export const TimelineCanvas = () => {
           currentDate = addYears(currentDate, 1)
         }
       } else {
-        // Generate years
-        let currentDate = startOfYear(startDate)
-        while (currentDate <= endDate) {
+        // Generate years - extend range to ensure coverage
+        let currentDate = startOfYear(new Date(startDate.getTime() - 3 * 365 * 24 * 60 * 60 * 1000)) // Start 3 years earlier
+        const extendedEndDate = new Date(endDate.getTime() + 3 * 365 * 24 * 60 * 60 * 1000) // End 3 years later
+
+        while (currentDate <= extendedEndDate) {
           const yearStart = startOfYear(currentDate)
           const yearEnd = endOfYear(currentDate)
           const daysInYear = differenceInDays(yearEnd, yearStart) + 1
-          const yearWidth = daysInYear * (currentScale / 20) // Adjust scale for years view
+          const yearWidth = daysInYear * (currentScale / 20)
           segments.push({
             label: format(currentDate, "yyyy"),
             width: yearWidth,
@@ -158,28 +195,11 @@ export const TimelineCanvas = () => {
     [],
   )
 
-  // Convert position to date based on reference date
-  const positionToDate = useCallback(
-    (xPos: number): Date => {
-      if (zoomLevel === ZoomLevel.Days) {
-        const dayOffset = Math.round(xPos / scale)
-        return addDays(REFERENCE_DATE, dayOffset)
-      } else if (zoomLevel === ZoomLevel.Months) {
-        const dayOffset = Math.round(xPos / (scale / 5))
-        return addDays(REFERENCE_DATE, dayOffset)
-      } else {
-        const dayOffset = Math.round(xPos / (scale / 20))
-        return addDays(REFERENCE_DATE, dayOffset)
-      }
-    },
-    [scale, zoomLevel],
-  )
-
   // Calculate date position based on reference date
   const calculateDatePosition = useCallback(
     (date: Date): number => {
       const diffTime = date.getTime() - REFERENCE_DATE.getTime()
-      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+      const diffDays = diffTime / (1000 * 60 * 60 * 24) // More precise - don't round here
 
       if (zoomLevel === ZoomLevel.Days) {
         return diffDays * scale
@@ -191,6 +211,22 @@ export const TimelineCanvas = () => {
     },
     [scale, zoomLevel],
   )
+
+  // Initialize the timeline position to center on DEFAULT_CENTER_DATE
+  useEffect(() => {
+    if (canvasRef.current && !isInitialized) {
+      const canvasWidth = canvasRef.current.clientWidth
+      const centerX = canvasWidth / 2
+
+      // Calculate position of DEFAULT_CENTER_DATE
+      const centerDatePosition = calculateDatePosition(DEFAULT_CENTER_DATE)
+
+      // Set position to center the default date
+      const initialPosition = centerX - centerDatePosition
+      setPosition(initialPosition)
+      setIsInitialized(true)
+    }
+  }, [calculateDatePosition, isInitialized])
 
   // Get current timeline segments based on visible range
   const { startDate, endDate } = getVisibleDateRange()
@@ -371,7 +407,7 @@ export const TimelineCanvas = () => {
         setPosition(newPosition)
       }
     },
-    [position, scale, positionToDate],
+    [position, scale, zoomLevel],
   )
 
   // Center on a specific element by ID
@@ -675,6 +711,76 @@ export const TimelineCanvas = () => {
           {/* Timeline ruler */}
           <div className="sticky top-0 z-10 h-16 bg-white border-b border-slate-200 select-none overflow-hidden">
             {renderTimelineRuler()}
+          </div>
+          {/* Timeline ruler indicators */}
+          <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-20">
+            {/* Event indicators */}
+            {events.map((event) => {
+              const eventX = calculateDatePosition(new Date(event.date))
+              const isVisible =
+                eventX >= -position - 100 && eventX <= -position + (canvasRef.current?.clientWidth || 1200) + 100
+
+              if (!isVisible) return null
+
+              return (
+                <div
+                  key={`ruler-event-${event.id}`}
+                  className="absolute top-0 bottom-0 flex items-end justify-center pb-1"
+                  style={{
+                    left: `${eventX}px`,
+                    transform: "translateX(-50%)",
+                  }}
+                >
+                  <div
+                    className="w-2 h-2 rounded-full border border-white shadow-sm"
+                    style={{
+                      backgroundColor: event.color,
+                    }}
+                    title={event.title}
+                  />
+                </div>
+              )
+            })}
+
+            {/* Span indicators */}
+            {spans.map((span) => {
+              const startX = calculateDatePosition(new Date(span.startDate))
+              const endX = calculateDatePosition(new Date(span.endDate))
+              const spanWidth = endX - startX
+              const isVisible =
+                endX >= -position - 100 && startX <= -position + (canvasRef.current?.clientWidth || 1200) + 100
+
+              if (!isVisible) return null
+
+              return (
+                <div
+                  key={`ruler-span-${span.id}`}
+                  className="absolute bottom-1 h-1 rounded-full shadow-sm"
+                  style={{
+                    left: `${startX}px`,
+                    width: `${spanWidth}px`,
+                    backgroundColor: span.color,
+                    opacity: 0.7,
+                  }}
+                  title={span.title}
+                >
+                  {/* Start marker */}
+                  <div
+                    className="absolute w-2 h-2 rounded-full border border-white shadow-sm -top-0.5 -left-1"
+                    style={{
+                      backgroundColor: span.color,
+                    }}
+                  />
+                  {/* End marker */}
+                  <div
+                    className="absolute w-2 h-2 rounded-full border border-white shadow-sm -top-0.5 -right-1"
+                    style={{
+                      backgroundColor: span.color,
+                    }}
+                  />
+                </div>
+              )
+            })}
           </div>
           {/* Timeline content */}
           <div className="relative h-[calc(100%-4rem)] pt-8 select-none">

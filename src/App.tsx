@@ -1,16 +1,43 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { TimelineCanvas } from "./components/Timeline/TimelineCanvas"
 import { TimelineToolbar } from "./components/Timeline/TimelineToolbar"
 import { useTimelineStore } from "./store/timelineStore" // Import useTimelineStore
 import { exportToCsv, importFromCsv } from "./utils/csvUtils" // Import CSV utilities
 import { TimelineSidebar } from "./components/Timeline/TimelineSidebar"
+
 export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const { events, spans, setEvents, setSpans } = useTimelineStore() // Get events, spans, and setters
+  const { events, spans, setEvents, setSpans, undo, redo, canUndo, canRedo } = useTimelineStore() // Get undo/redo functions
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Add keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "z") {
+        e.preventDefault()
+        if (canUndo()) {
+          undo()
+        }
+      } else if (
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "Z") ||
+        ((e.ctrlKey || e.metaKey) && e.key === "y")
+      ) {
+        e.preventDefault()
+        if (canRedo()) {
+          redo()
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [undo, redo, canUndo, canRedo])
+
   const handleExport = () => {
     try {
       console.log("Exporting timeline data:", { events, spans })
@@ -37,9 +64,11 @@ export function App() {
       alert("Failed to export timeline data. Please try again.")
     }
   }
+
   const handleImportClick = () => {
     fileInputRef.current?.click()
   }
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
@@ -59,6 +88,7 @@ export function App() {
       reader.readAsText(file)
     }
   }
+
   return (
     <div className="flex flex-col w-full h-screen bg-slate-50 overflow-hidden">
       <header className="flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200">

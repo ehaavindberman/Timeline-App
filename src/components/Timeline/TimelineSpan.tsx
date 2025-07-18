@@ -189,6 +189,9 @@ export const TimelineSpan = ({ span, calculateDatePosition, zoomLevel }: Timelin
 
   const isSelected = selectedElementId === span.id
 
+  // Calculate the center position for the info card
+  const centerX = position.x + width / 2
+
   return (
     <div
       className={`absolute ${
@@ -197,17 +200,60 @@ export const TimelineSpan = ({ span, calculateDatePosition, zoomLevel }: Timelin
       style={{
         left: `${position.x}px`,
         top: `${position.y}px`,
-        width: `${width}px`,
       }}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
       title="Drag to move (hold Shift to lock date)"
     >
+      {/* Date range bar - positioned at the top */}
       <div
-        className={`rounded-md transition-shadow select-none ${isSelected ? "shadow-lg ring-2 ring-blue-400" : "shadow-md"}`}
+        className={`h-3 rounded transition-shadow select-none ${
+          isSelected ? "shadow-lg ring-2 ring-blue-400" : "shadow-sm"
+        }`}
         style={{
+          width: `${width}px`,
           backgroundColor: span.color,
-          opacity: 0.9,
+          opacity: 0.8,
+        }}
+      >
+        {/* Resize handles on the date bar */}
+        <div
+          className="absolute left-0 top-0 w-2 h-full cursor-ew-resize z-10 bg-transparent hover:bg-black hover:bg-opacity-20 rounded-l"
+          onMouseDown={(e) => handleResizeStart(e, "left")}
+        />
+        <div
+          className="absolute right-0 top-0 w-2 h-full cursor-ew-resize z-10 bg-transparent hover:bg-black hover:bg-opacity-20 rounded-r"
+          onMouseDown={(e) => handleResizeStart(e, "right")}
+        />
+      </div>
+
+      {/* Vertical lines from start and end of date bar */}
+      <div className="absolute w-px h-5 bg-slate-300 left-0 top-full pointer-events-none" />
+      <div className="absolute w-px h-5 bg-slate-300 right-0 top-full pointer-events-none" />
+
+      {/* Start and end date markers */}
+      <div
+        className="absolute w-3 h-3 rounded-full bg-white border-2 left-0 top-full -translate-x-1/2 pointer-events-none"
+        style={{
+          borderColor: span.color,
+        }}
+      />
+      <div
+        className="absolute w-3 h-3 rounded-full bg-white border-2 right-0 top-full translate-x-1/2 pointer-events-none"
+        style={{
+          borderColor: span.color,
+        }}
+      />
+
+      {/* Compact info card - centered below the date bar */}
+      <div
+        className={`absolute top-full mt-5 flex flex-col min-w-[150px] max-w-[250px] rounded-md shadow-md transition-shadow select-none ${
+          isSelected ? "shadow-lg ring-2 ring-blue-400" : ""
+        }`}
+        style={{
+          left: `${width / 2}px`,
+          transform: "translateX(-50%)",
+          backgroundColor: span.color,
         }}
       >
         <div className="px-3 py-2 bg-white rounded-t-md">
@@ -231,21 +277,24 @@ export const TimelineSpan = ({ span, calculateDatePosition, zoomLevel }: Timelin
             </div>
           )}
         </div>
-        <div className="px-3 py-2 text-xs text-white flex justify-between pointer-events-none select-none">
-          <span>{new Date(span.startDate).toLocaleDateString()}</span>
-          <span>to</span>
-          <span>{new Date(span.endDate).toLocaleDateString()}</span>
+        <div className="px-3 py-1.5 text-xs text-white pointer-events-none select-none">
+          <div className="flex justify-between items-center">
+            <span>{new Date(span.startDate).toLocaleDateString()}</span>
+            <span className="mx-2">to</span>
+            <span>{new Date(span.endDate).toLocaleDateString()}</span>
+          </div>
         </div>
       </div>
-      {/* Resize handles */}
+
+      {/* Connection line from center of date bar to info card */}
       <div
-        className="absolute left-0 top-0 w-2 h-full cursor-ew-resize z-10"
-        onMouseDown={(e) => handleResizeStart(e, "left")}
+        className="absolute w-px h-5 bg-slate-300 top-full pointer-events-none"
+        style={{
+          left: `${width / 2}px`,
+          transform: "translateX(-50%)",
+        }}
       />
-      <div
-        className="absolute right-0 top-0 w-2 h-full cursor-ew-resize z-10"
-        onMouseDown={(e) => handleResizeStart(e, "right")}
-      />
+
       {/* Visual indicator for drag mode */}
       {isDragging && (
         <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap select-none z-40">

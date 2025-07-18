@@ -139,19 +139,35 @@ export const TimelineEvent = ({ event, calculateDatePosition, zoomLevel }: Timel
       } select-none`}
       style={{
         left: `${position.x}px`,
-        top: `${position.y}px`,
-        transform: "translate(-50%, 0)",
+        top: `${position.y}px`, // This is now the Y of the circle
+        transform: "translateX(-50%)", // Centers the whole element horizontally
       }}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
       title="Drag to move (hold Shift to lock date)"
     >
+      {/* Circle at the very top */}
       <div
-        className={`flex flex-col min-w-[150px] max-w-[250px] rounded-md shadow-md transition-shadow select-none ${
+        className="absolute w-3 h-3 rounded-full bg-white border-2 left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+        style={{
+          borderColor: event.color,
+        }}
+      />
+      {/* Vertical line from circle down to card */}
+      <div className="absolute w-px h-5 bg-slate-300 left-1/2 top-0 mt-1.5 pointer-events-none" /> {/* mt-1.5 is 6px */}
+      {/* Info card */}
+      <div
+        className={`absolute flex flex-col min-w-[150px] max-w-[250px] rounded-md shadow-md transition-shadow select-none ${
           isSelected ? "shadow-lg ring-2 ring-blue-400" : ""
         }`}
         style={{
           backgroundColor: event.color,
+          // Position relative to the main container's top (which is position.y)
+          // Circle is 12px high, line is 20px high, plus 6px margin for line, plus 4px margin for card
+          // Total offset: 6px (half circle) + 6px (line margin) + 20px (line height) + 4px (card margin) = 36px
+          top: "36px", // This will place it below the circle and line
+          left: "50%", // Center horizontally relative to parent
+          transform: "translateX(-50%)", // Adjust for its own width
         }}
       >
         <div className="px-3 py-2 bg-white rounded-t-md">
@@ -179,13 +195,6 @@ export const TimelineEvent = ({ event, calculateDatePosition, zoomLevel }: Timel
           {new Date(event.date).toLocaleDateString()}
         </div>
       </div>
-      <div className="absolute w-px h-20 bg-slate-300 left-1/2 bottom-full mb-1 pointer-events-none" />
-      <div
-        className="absolute w-3 h-3 rounded-full bg-white border-2 left-1/2 bottom-full mb-1 -translate-x-1/2 pointer-events-none"
-        style={{
-          borderColor: event.color,
-        }}
-      />
       {/* Visual indicator for drag mode */}
       {isDragging && (
         <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-black text-white text-xs rounded whitespace-nowrap select-none z-40">
