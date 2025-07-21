@@ -15,7 +15,8 @@ import {
   startOfYear,
   endOfYear,
 } from "date-fns"
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { TimelineControls } from "./TimelineControls"
+import { OffscreenIndicators } from "./OffscreenIndicators"
 
 // Default reference date for calculations (can be any date)
 export const REFERENCE_DATE = new Date(2023, 0, 1) // Jan 1, 2023
@@ -92,60 +93,131 @@ export const TimelineCanvas = () => {
 
   // Calculate the visible date range based on current position and canvas width
   const getVisibleDateRange = useCallback(() => {
-    if (!canvasRef.current) {
-      // Fallback - calculate based on current position even without canvas
-      const fallbackWidth = 1200 // reasonable default
-      const visibleStartX = -position - fallbackWidth
-      const visibleEndX = -position + fallbackWidth * 2
+    const fallbackWidth = 1200
+    const canvasWidth = canvasRef.current?.clientWidth || fallbackWidth
+    const buffer = Math.max(canvasWidth * 2, 2400)
 
-      const startDate = positionToDate(visibleStartX)
-      const endDate = positionToDate(visibleEndX)
+    // FIXED: Calculate the absolute timeline positions correctly
+    // position is the CSS transform offset, so we need to convert to absolute timeline coordinates
+    const viewportLeftEdge = -position // Left edge of visible area in timeline coordinates
+    const viewportRightEdge = -position + canvasWidth // Right edge of visible area
 
-      return { startDate, endDate }
-    }
+    // Add buffer to get the range we need to generate segments for
+    const visibleStartX = viewportLeftEdge - buffer
+    const visibleEndX = viewportRightEdge + buffer
 
-    const canvasWidth = canvasRef.current.clientWidth
-    // Calculate the absolute timeline positions that are currently visible
-    // Add extra buffer for smooth scrolling and preloading
-    const buffer = canvasWidth * 1.5 // 1.5x canvas width buffer on each side
-    const visibleStartX = -position - buffer
-    const visibleEndX = -position + canvasWidth + buffer
+    console.log("📍 FIXED getVisibleDateRange Debug:", {
+      position: Math.round(position),
+      canvasWidth,
+      buffer,
+      viewportLeftEdge: Math.round(viewportLeftEdge),
+      viewportRightEdge: Math.round(viewportRightEdge),
+      visibleStartX: Math.round(visibleStartX),
+      visibleEndX: Math.round(visibleEndX),
+      viewportCenter: Math.round(viewportLeftEdge + canvasWidth / 2),
+    })
 
-    // Convert positions to dates using our position-to-date conversion
     const startDate = positionToDate(visibleStartX)
     const endDate = positionToDate(visibleEndX)
 
-    return { startDate, endDate }
-  }, [position, zoomLevel])
+    // Verify the center calculation
+    const centerX = viewportLeftEdge + canvasWidth / 2
+    const centerDate = positionToDate(centerX)
+
+    console.log("📅 Date Range Verification:", {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      centerX: Math.round(centerX),
+      centerDate: centerDate.toISOString(),
+      expectedCenter: "Should be around April 2023 initially",
+    })
+
+    return { startDate, endDate, canvasWidth, buffer }
+  }, [position, positionToDate])
 
   // Generate timeline segments based on visible range
   const generateTimelineSegments = useCallback(
     (currentScale: number, currentZoomLevel: ZoomLevel, startDate: Date, endDate: Date) => {
+      console.group(`🔍 generateTimelineSegments Debug`)
+      console.log("📊 Input Parameters:", {
+        currentScale,
+        currentZoomLevel: ZoomLevel[currentZoomLevel],
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        dateRange: `${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
+      })
+
       const segments = []
 
+      // Calculate the actual pixels per day based on zoom level
+      // This ensures consistency with calculateDatePosition function
+      let pixelsPerDay: number
       if (currentZoomLevel === ZoomLevel.Days) {
-        // Generate months with days - extend range to ensure coverage
-        let currentDate = startOfMonth(new Date(startDate.getTime() - 31 * 24 * 60 * 60 * 1000)) // Start one month earlier
-        const extendedEndDate = new Date(endDate.getTime() + 31 * 24 * 60 * 60 * 1000) // End one month later
+        pixelsPerDay = currentScale
+      } else if (currentZoomLevel === ZoomLevel.Months) {
+        pixelsPerDay = currentScale / 5
+      } else {
+        pixelsPerDay = currentScale / 20
+      }
 
+      console.log("📐 Pixels per day:", pixelsPerDay)
+
+      if (currentZoomLevel === ZoomLevel.Days) {
+        // Generate months with days - extend range with buffer to ensure full coverage
+        let currentDate = startOfMonth(new Date(startDate.getTime() - 62 * 24 * 60 * 60 * 1000)) // Start 2 months earlier
+        const extendedEndDate = new Date(endDate.getTime() + 62 * 24 * 60 * 60 * 1000) // End 2 months later
+
+        console.log("📅 Days Level - Extended Range:", {
+          originalStart: startDate.toISOString(),
+          extendedStart: currentDate.toISOString(),
+          originalEnd: endDate.toISOString(),
+          extendedEnd: extendedEndDate.toISOString(),
+          bufferDays: 62,
+        })
+
+        let segmentIndex = 0
         while (currentDate <= extendedEndDate) {
           const month = currentDate.getMonth()
           const year = currentDate.getFullYear()
           const daysInMonth = new Date(year, month + 1, 0).getDate()
+          const segmentWidth = daysInMonth * pixelsPerDay
+
           segments.push({
             label: format(currentDate, "MMMM yyyy"),
-            width: daysInMonth * currentScale,
+            width: segmentWidth,
             days: daysInMonth,
             date: new Date(currentDate),
             type: "month",
           })
-          currentDate = addMonths(currentDate, 1)
-        }
-      } else if (currentZoomLevel === ZoomLevel.Months) {
-        // Generate years with months - extend range to ensure coverage
-        let currentDate = startOfYear(new Date(startDate.getTime() - 365 * 24 * 60 * 60 * 1000)) // Start one year earlier
-        const extendedEndDate = new Date(endDate.getTime() + 365 * 24 * 60 * 60 * 1000) // End one year later
 
+          if (segmentIndex < 5 || segmentIndex % 10 === 0) {
+            console.log(`📊 Segment ${segmentIndex}:`, {
+              label: format(currentDate, "MMMM yyyy"),
+              width: Math.round(segmentWidth),
+              days: daysInMonth,
+              date: currentDate.toISOString(),
+            })
+          }
+
+          currentDate = addMonths(currentDate, 1)
+          segmentIndex++
+        }
+
+        console.log(`✅ Days Level - Generated ${segments.length} month segments`)
+      } else if (currentZoomLevel === ZoomLevel.Months) {
+        // Generate years with months - extend range with buffer to ensure full coverage
+        let currentDate = startOfYear(new Date(startDate.getTime() - 2 * 365 * 24 * 60 * 60 * 1000)) // Start 2 years earlier
+        const extendedEndDate = new Date(endDate.getTime() + 2 * 365 * 24 * 60 * 60 * 1000) // End 2 years later
+
+        console.log("📅 Months Level - Extended Range:", {
+          originalStart: startDate.toISOString(),
+          extendedStart: currentDate.toISOString(),
+          originalEnd: endDate.toISOString(),
+          extendedEnd: extendedEndDate.toISOString(),
+          bufferYears: 2,
+        })
+
+        let segmentIndex = 0
         while (currentDate <= extendedEndDate) {
           const year = currentDate.getFullYear()
           const yearSegment = {
@@ -155,41 +227,121 @@ export const TimelineCanvas = () => {
             date: new Date(currentDate),
             type: "year",
           }
+
+          let yearWidth = 0
           for (let month = 0; month < 12; month++) {
             const monthDate = new Date(year, month, 1)
             const monthStart = startOfMonth(monthDate)
             const monthEnd = endOfMonth(monthDate)
             const daysInMonth = differenceInDays(monthEnd, monthStart) + 1
-            const monthWidth = daysInMonth * (currentScale / 5)
+            const monthWidth = daysInMonth * pixelsPerDay
+
             yearSegment.months.push({
               label: format(monthDate, "MMM"),
               width: monthWidth,
               date: new Date(monthDate),
             })
-            yearSegment.width += monthWidth
+            yearWidth += monthWidth
           }
-          segments.push(yearSegment)
-          currentDate = addYears(currentDate, 1)
-        }
-      } else {
-        // Generate years - extend range to ensure coverage
-        let currentDate = startOfYear(new Date(startDate.getTime() - 3 * 365 * 24 * 60 * 60 * 1000)) // Start 3 years earlier
-        const extendedEndDate = new Date(endDate.getTime() + 3 * 365 * 24 * 60 * 60 * 1000) // End 3 years later
+          yearSegment.width = yearWidth
 
+          segments.push(yearSegment)
+
+          if (segmentIndex < 3) {
+            console.log(`📊 Year Segment ${segmentIndex}:`, {
+              label: yearSegment.label,
+              width: Math.round(yearSegment.width),
+              monthsCount: yearSegment.months.length,
+              date: currentDate.toISOString(),
+              firstMonth: yearSegment.months[0]?.label,
+              lastMonth: yearSegment.months[11]?.label,
+            })
+          }
+
+          currentDate = addYears(currentDate, 1)
+          segmentIndex++
+        }
+
+        console.log(`✅ Months Level - Generated ${segments.length} year segments`)
+      } else {
+        // Generate years - extend range with buffer to ensure full coverage
+        let currentDate = startOfYear(new Date(startDate.getTime() - 10 * 365 * 24 * 60 * 60 * 1000)) // Start 10 years earlier
+        const extendedEndDate = new Date(endDate.getTime() + 10 * 365 * 24 * 60 * 60 * 1000) // End 10 years later
+
+        console.log("📅 Years Level - Extended Range:", {
+          originalStart: startDate.toISOString(),
+          extendedStart: currentDate.toISOString(),
+          originalEnd: endDate.toISOString(),
+          extendedEnd: extendedEndDate.toISOString(),
+          bufferYears: 10,
+        })
+
+        let segmentIndex = 0
         while (currentDate <= extendedEndDate) {
           const yearStart = startOfYear(currentDate)
           const yearEnd = endOfYear(currentDate)
           const daysInYear = differenceInDays(yearEnd, yearStart) + 1
-          const yearWidth = daysInYear * (currentScale / 20)
+          const yearWidth = daysInYear * pixelsPerDay
+
           segments.push({
             label: format(currentDate, "yyyy"),
             width: yearWidth,
             date: new Date(currentDate),
             type: "year",
           })
+
+          if (segmentIndex < 5 || segmentIndex % 5 === 0) {
+            console.log(`📊 Year Segment ${segmentIndex}:`, {
+              label: format(currentDate, "yyyy"),
+              width: Math.round(yearWidth),
+              days: daysInYear,
+              date: currentDate.toISOString(),
+            })
+          }
+
           currentDate = addYears(currentDate, 1)
+          segmentIndex++
+        }
+
+        console.log(`✅ Years Level - Generated ${segments.length} year segments`)
+      }
+
+      // Check for gaps and coverage
+      if (segments.length === 0) {
+        console.error("❌ No timeline segments generated for range:", startDate, "to", endDate)
+      } else {
+        const firstSegment = segments[0]
+        const lastSegment = segments[segments.length - 1]
+        const totalWidth = segments.reduce((sum, segment) => sum + segment.width, 0)
+
+        console.log("📏 Coverage Analysis:", {
+          totalSegments: segments.length,
+          totalWidth: Math.round(totalWidth),
+          firstSegmentDate: firstSegment.date.toISOString(),
+          lastSegmentDate: lastSegment.date.toISOString(),
+          firstSegmentLabel: firstSegment.label,
+          lastSegmentLabel: lastSegment.label,
+          averageSegmentWidth: Math.round(totalWidth / segments.length),
+        })
+
+        // Check for potential gaps between segments
+        for (let i = 1; i < Math.min(segments.length, 5); i++) {
+          const prevSegment = segments[i - 1]
+          const currentSegment = segments[i]
+          const expectedNextDate =
+            currentZoomLevel === ZoomLevel.Days ? addMonths(prevSegment.date, 1) : addYears(prevSegment.date, 1)
+
+          if (currentSegment.date.getTime() !== expectedNextDate.getTime()) {
+            console.warn(`⚠️  Potential gap between segments ${i - 1} and ${i}:`, {
+              prevDate: prevSegment.date.toISOString(),
+              currentDate: currentSegment.date.toISOString(),
+              expectedDate: expectedNextDate.toISOString(),
+            })
+          }
         }
       }
+
+      console.groupEnd()
       return segments
     },
     [],
@@ -225,6 +377,15 @@ export const TimelineCanvas = () => {
       const initialPosition = centerX - centerDatePosition
       setPosition(initialPosition)
       setIsInitialized(true)
+
+      console.log("🎯 Initial Positioning:", {
+        canvasWidth,
+        centerX,
+        defaultCenterDate: DEFAULT_CENTER_DATE.toISOString(),
+        centerDatePosition: Math.round(centerDatePosition),
+        initialPosition: Math.round(initialPosition),
+        verification: "Center should be at DEFAULT_CENTER_DATE",
+      })
     }
   }, [calculateDatePosition, isInitialized])
 
@@ -239,8 +400,18 @@ export const TimelineCanvas = () => {
   const firstSegmentPosition = useMemo(() => {
     if (currentTimelineSegments.length === 0) return 0
     const firstSegmentDate = currentTimelineSegments[0].date
-    return calculateDatePosition(firstSegmentDate)
-  }, [currentTimelineSegments, calculateDatePosition])
+    const segmentPosition = calculateDatePosition(firstSegmentDate)
+
+    console.log("🎯 First Segment Positioning:", {
+      firstSegmentDate: firstSegmentDate.toISOString(),
+      firstSegmentPosition: Math.round(segmentPosition),
+      currentPosition: Math.round(position),
+      viewportCenter: Math.round(-position + (canvasRef.current?.clientWidth || 1200) / 2),
+      centerDate: positionToDate(-position + (canvasRef.current?.clientWidth || 1200) / 2).toISOString(),
+    })
+
+    return segmentPosition
+  }, [currentTimelineSegments, calculateDatePosition, position, positionToDate])
 
   // Snap x position to nearest day/month/year depending on zoom level
   const snapToGrid = useCallback(
@@ -342,7 +513,7 @@ export const TimelineCanvas = () => {
       // 5. Calculate the absolute X position of `dateUnderCenter` with the new scale
       const newZoomLevel = getZoomLevelFromScale(newScale)
       const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime()
-      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+      const diffDays = diffTime / (1000 * 60 * 60 * 24)
 
       let absoluteXForCenteredDateAtNewScale: number
       if (newZoomLevel === ZoomLevel.Days) {
@@ -388,7 +559,7 @@ export const TimelineCanvas = () => {
 
         // Calculate the absolute X position of `dateUnderCenter` with the new scale
         const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime()
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
+        const diffDays = diffTime / (1000 * 60 * 60 * 24)
 
         let absoluteXForCenteredDateAtNewScale: number
         if (level === ZoomLevel.Days) {
@@ -407,7 +578,7 @@ export const TimelineCanvas = () => {
         setPosition(newPosition)
       }
     },
-    [position, scale, zoomLevel],
+    [position, positionToDate],
   )
 
   // Center on a specific element by ID
@@ -628,65 +799,13 @@ export const TimelineCanvas = () => {
 
   return (
     <div className="relative flex-1 overflow-hidden bg-white select-none">
-      <div className="absolute top-4 right-4 flex space-x-2 z-10">
-        <button
-          onClick={() => handleZoom(0.8)}
-          className="p-2 bg-white rounded-full shadow-md hover:bg-slate-50 hover:shadow-lg transition-all duration-200 active:scale-95 select-none"
-          title="Zoom Out"
-        >
-          <span className="text-lg font-bold text-slate-600 select-none">-</span>
-        </button>
-        <button
-          onClick={() => handleZoom(1.25)}
-          className="p-2 bg-white rounded-full shadow-md hover:bg-slate-50 hover:shadow-lg transition-all duration-200 active:scale-95 select-none"
-          title="Zoom In"
-        >
-          <span className="text-lg font-bold text-slate-600 select-none">+</span>
-        </button>
-      </div>
-      <div
-        className="absolute top-1/2 left-4 transform -translate-y-1/2 z-10"
-        onClick={() => setPosition(position + 500)} // Scroll left
-      >
-        <button className="p-2 bg-white rounded-full shadow-md hover:bg-slate-50 select-none">
-          <ChevronLeftIcon size={20} />
-        </button>
-      </div>
-      <div
-        className="absolute top-1/2 right-4 transform -translate-y-1/2 z-10"
-        onClick={() => setPosition(position - 500)} // Scroll right
-      >
-        <button className="p-2 bg-white rounded-full shadow-md hover:bg-slate-50 select-none">
-          <ChevronRightIcon size={20} />
-        </button>
-      </div>
-      {/* Off-screen indicators */}
-      <div className="absolute inset-y-0 left-0 flex flex-col items-start justify-center pointer-events-none z-20">
-        {offscreenElements.left.map((elem, index) => (
-          <div
-            key={`left-${elem.id}`}
-            className="ml-1 my-1 w-3 h-3 rounded-full cursor-pointer opacity-70 hover:opacity-100 transition-opacity pointer-events-auto select-none"
-            style={{
-              backgroundColor: elem.color,
-            }}
-            onClick={() => centerOnElement(elem.id)}
-            title="Click to center this element"
-          />
-        ))}
-      </div>
-      <div className="absolute inset-y-0 right-0 flex flex-col items-end justify-center pointer-events-none z-20">
-        {offscreenElements.right.map((elem, index) => (
-          <div
-            key={`right-${elem.id}`}
-            className="mr-1 my-1 w-3 h-3 rounded-full cursor-pointer opacity-70 hover:opacity-100 transition-opacity pointer-events-auto select-none"
-            style={{
-              backgroundColor: elem.color,
-            }}
-            onClick={() => centerOnElement(elem.id)}
-            title="Click to center this element"
-          />
-        ))}
-      </div>
+      <TimelineControls
+        onZoomIn={() => handleZoom(1.25)}
+        onZoomOut={() => handleZoom(0.8)}
+        onScrollLeft={() => setPosition(position + 500)}
+        onScrollRight={() => setPosition(position - 500)}
+      />
+      <OffscreenIndicators offscreenElements={offscreenElements} onCenterElement={centerOnElement} />
       <div
         id="timeline-canvas"
         ref={canvasRef}
