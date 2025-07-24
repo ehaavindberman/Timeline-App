@@ -70,12 +70,15 @@
     "tsx": "latest",
     "use-sync-external-store": "latest",
     "vaul": "^0.9.6",
+    "vis-data": "^8.0.1",
+    "vis-timeline": "^8.1.1",
     "vite": "latest",
     "yaml": "latest",
     "zod": "^3.24.1",
     "zustand": "latest"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.20",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

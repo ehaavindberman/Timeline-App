@@ -3,7 +3,7 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import { useTimelineStore } from "../../store/timelineStore"
-import type { ZoomLevel } from "./TimelineCanvas"
+import { ZoomLevel } from "../../utils/timelineSegments"
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react"
 
 type TimelineSpanProps = {

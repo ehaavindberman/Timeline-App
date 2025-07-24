@@ -12,8 +12,8 @@ interface TimelineControlsProps {
 export const TimelineControls = ({ onZoomIn, onZoomOut, onScrollLeft, onScrollRight }: TimelineControlsProps) => {
   return (
     <>
-      {/* Zoom Controls - Top Right */}
-      <div className="absolute top-4 right-4 flex space-x-2 z-10">
+      {/* Zoom Controls - Below Timeline Ruler */}
+      <div className="absolute top-16 right-4 flex space-x-2 z-10">
         <button
           onClick={onZoomOut}
           className="p-2 bg-white rounded-full shadow-md hover:bg-slate-50 hover:shadow-lg transition-all duration-200 active:scale-95 select-none"

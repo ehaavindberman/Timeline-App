@@ -1,6 +1,5 @@
 "use client"
 import { useTimelineStore } from "../../store/timelineStore"
-import { ZoomLevel } from "./TimelineCanvas"
 import {
   CalendarIcon,
   ArrowRightIcon,
@@ -89,7 +88,7 @@ export const TimelineToolbar = ({
     }
   }
 
-  const handleSetPresetZoom = (level: ZoomLevel) => {
+  const handleSetPresetZoom = (level: 'day' | 'month' | 'year') => {
     const timelineConfig = (window as any).timelineConfig
     if (timelineConfig && timelineConfig.setPresetZoom) {
       timelineConfig.setPresetZoom(level)
@@ -161,19 +160,19 @@ export const TimelineToolbar = ({
       <div className="flex items-center space-x-2">
         <div className="flex items-center space-x-1 border border-slate-200 rounded-md p-1">
           <button
-            onClick={() => handleSetPresetZoom(ZoomLevel.Days)}
+            onClick={() => handleSetPresetZoom('day')}
             className="px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 rounded-sm"
           >
             Day
           </button>
           <button
-            onClick={() => handleSetPresetZoom(ZoomLevel.Months)}
+            onClick={() => handleSetPresetZoom('month')}
             className="px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 rounded-sm"
           >
             Month
           </button>
           <button
-            onClick={() => handleSetPresetZoom(ZoomLevel.Years)}
+            onClick={() => handleSetPresetZoom('year')}
             className="px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 rounded-sm"
           >
             Year
