@@ -2,13 +2,6 @@ import React, { useMemo } from "react"
 import { format, addDays, addHours, addMinutes, addSeconds, addMilliseconds } from "date-fns"
 import { REFERENCE_DATE } from "../../utils/timelineCalculations"
 
-// Enum for different zoom levels (kept for compatibility)
-export enum ZoomLevel {
-  Days = 0,
-  Months = 1,
-  Years = 2,
-}
-
 // Type for scale-based ruler segments
 type RulerSegment = {
   date: Date
