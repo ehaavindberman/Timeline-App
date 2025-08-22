@@ -1,6 +1,5 @@
-
 import React, { useMemo } from "react"
-import { format } from "date-fns"
+import { format, addDays, addHours, addMinutes, addSeconds, addMilliseconds } from "date-fns"
 import { REFERENCE_DATE } from "../../utils/timelineCalculations"
 
 // Enum for different zoom levels (kept for compatibility)
@@ -10,134 +9,279 @@ export enum ZoomLevel {
   Years = 2,
 }
 
-// Type for timeline segments
-type TimelineSegment = {
-  label: string
-  width: number
+// Type for scale-based ruler segments
+type RulerSegment = {
   date: Date
-  days?: number
-  months?: Array<{
-    label: string
-    width: number
-    date: Date
-  }>
+  label: string
+  position: number
+  isMainTick: boolean
+  tickHeight: 'small' | 'medium' | 'large'
 }
 
 interface TimelineRulerProps {
   zoomLevel: ZoomLevel
   firstSegmentPosition: number
-  currentTimelineSegments: TimelineSegment[]
+  currentTimelineSegments: any[] // Legacy prop, not used in new implementation
   scale: number
-  position: number
+  position?: number // Current scroll position from TimelineCanvas
+}
+
+// Helper function to determine appropriate time intervals based on scale
+const getTimeIntervals = (scale: number) => {
+  // Scale represents pixels per day
+  const pixelsPerDay = scale
+  
+  // Define intervals in ascending order of granularity
+  const intervals = [
+    // Very zoomed out - years
+    { threshold: 0.1, major: { unit: 'year', step: 10 }, minor: { unit: 'year', step: 1 } },
+    { threshold: 0.5, major: { unit: 'year', step: 5 }, minor: { unit: 'year', step: 1 } },
+    { threshold: 1, major: { unit: 'year', step: 1 }, minor: { unit: 'month', step: 6 } },
+    
+    // Medium zoom - months and weeks
+    { threshold: 3, major: { unit: 'month', step: 6 }, minor: { unit: 'month', step: 1 } },
+    { threshold: 8, major: { unit: 'month', step: 3 }, minor: { unit: 'month', step: 1 } },
+    { threshold: 15, major: { unit: 'month', step: 1 }, minor: { unit: 'week', step: 1 } },
+    
+    // Zoomed in - days and hours
+    { threshold: 30, major: { unit: 'week', step: 1 }, minor: { unit: 'day', step: 1 } },
+    { threshold: 60, major: { unit: 'day', step: 7 }, minor: { unit: 'day', step: 1 } },
+    { threshold: 120, major: { unit: 'day', step: 1 }, minor: { unit: 'hour', step: 6 } },
+    
+    // Very zoomed in - hours and minutes
+    { threshold: 500, major: { unit: 'hour', step: 12 }, minor: { unit: 'hour', step: 1 } },
+    { threshold: 1000, major: { unit: 'hour', step: 6 }, minor: { unit: 'hour', step: 1 } },
+    { threshold: 2000, major: { unit: 'hour', step: 1 }, minor: { unit: 'minute', step: 15 } },
+    
+    // Extremely zoomed in - minutes and seconds
+    { threshold: 5000, major: { unit: 'minute', step: 30 }, minor: { unit: 'minute', step: 5 } },
+    { threshold: 10000, major: { unit: 'minute', step: 15 }, minor: { unit: 'minute', step: 1 } },
+    { threshold: 20000, major: { unit: 'minute', step: 5 }, minor: { unit: 'second', step: 30 } },
+    { threshold: 50000, major: { unit: 'minute', step: 1 }, minor: { unit: 'second', step: 10 } },
+  ]
+  
+  // Find the appropriate interval based on scale
+  for (let i = intervals.length - 1; i >= 0; i--) {
+    if (pixelsPerDay >= intervals[i].threshold) {
+      return intervals[i]
+    }
+  }
+  
+  // Fallback to the first interval
+  return intervals[0]
+}
+
+// Helper function to add time based on unit and step
+const addTime = (date: Date, unit: string, step: number): Date => {
+  switch (unit) {
+    case 'year':
+      return new Date(date.getFullYear() + step, date.getMonth(), date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds())
+    case 'month':
+      return new Date(date.getFullYear(), date.getMonth() + step, date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds())
+    case 'week':
+      return addDays(date, step * 7)
+    case 'day':
+      return addDays(date, step)
+    case 'hour':
+      return addHours(date, step)
+    case 'minute':
+      return addMinutes(date, step)
+    case 'second':
+      return addSeconds(date, step)
+    case 'millisecond':
+      return addMilliseconds(date, step)
+    default:
+      return addDays(date, step)
+  }
+}
+
+// Helper function to format labels based on unit
+const formatLabel = (date: Date, unit: string, isMainTick: boolean): string => {
+  switch (unit) {
+    case 'year':
+      return format(date, 'yyyy')
+    case 'month':
+      return isMainTick ? format(date, 'MMM yyyy') : format(date, 'MMM')
+    case 'week':
+      return format(date, 'MMM d')
+    case 'day':
+      return isMainTick ? format(date, 'MMM d') : format(date, 'd')
+    case 'hour':
+      return isMainTick ? format(date, 'MMM d, HH:mm') : format(date, 'HH:mm')
+    case 'minute':
+      return isMainTick ? format(date, 'HH:mm') : format(date, 'mm')
+    case 'second':
+      return isMainTick ? format(date, 'HH:mm:ss') : format(date, 'ss')
+    default:
+      return format(date, 'MMM d')
+  }
+}
+
+// Helper function to calculate date position
+const calculateDatePosition = (date: Date, referenceDate: Date, scale: number): number => {
+  const diffTime = date.getTime() - referenceDate.getTime()
+  const diffDays = diffTime / (1000 * 60 * 60 * 24)
+  // Scale is always pixels per day
+  return diffDays * scale
 }
 
 export const TimelineRuler: React.FC<TimelineRulerProps> = ({
-  zoomLevel,
   firstSegmentPosition,
-  currentTimelineSegments,
   scale,
-  position,
+  position = 0,
 }) => {
-  // Generate ruler segments based on the current visible range
-  const rulerSegments = useMemo(() => {
-    const segments: Array<{
-      date: Date
-      label: string
-      position: number
-      isMainTick: boolean
-      tickHeight: 'small' | 'medium' | 'large'
-    }> = []
-
-    // Calculate positions for each timeline segment
-    let cumulativeWidth = 0
+  
+  // Calculate visible date range based on position and scale
+  const visibleRange = useMemo(() => {
+    // Estimate canvas width (this could be passed as prop in the future)
+    const canvasWidth = 1200
+    const buffer = canvasWidth * 2
     
-    currentTimelineSegments.forEach((segment, index) => {
-      const segmentPosition = firstSegmentPosition + cumulativeWidth
+    // The ruler is inside a container that already has translateX applied
+    // So we need to account for the current scroll position
+    const viewportLeftEdge = -position
+    const viewportRightEdge = viewportLeftEdge + canvasWidth
+    
+    // Calculate start and end positions with buffer
+    const startPos = viewportLeftEdge - buffer
+    const endPos = viewportRightEdge + buffer
+    
+    // Convert positions to dates using continuous scale (pixels per day)
+    const diffDays = startPos / scale
+    const startDate = new Date(REFERENCE_DATE.getTime() + diffDays * 24 * 60 * 60 * 1000)
+    
+    const endDiffDays = endPos / scale
+    const endDate = new Date(REFERENCE_DATE.getTime() + endDiffDays * 24 * 60 * 60 * 1000)
+    
+    return { startDate, endDate, startPos, endPos }
+  }, [position, scale])
+  
+  // Generate ruler segments based on current scale
+  const rulerSegments = useMemo(() => {
+    const intervals = getTimeIntervals(scale)
+    const segments: RulerSegment[] = []
+    
+    // Generate major ticks
+    let currentDate = new Date(visibleRange.startDate)
+    
+    // Align to appropriate boundary for major ticks
+    switch (intervals.major.unit) {
+      case 'year':
+        currentDate = new Date(Math.floor(currentDate.getFullYear() / intervals.major.step) * intervals.major.step, 0, 1)
+        break
+      case 'month':
+        currentDate = new Date(currentDate.getFullYear(), Math.floor(currentDate.getMonth() / intervals.major.step) * intervals.major.step, 1)
+        break
+      case 'week':
+        const dayOfWeek = currentDate.getDay()
+        currentDate = addDays(currentDate, -dayOfWeek)
+        break
+      case 'day':
+        currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+        break
+      case 'hour':
+        currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), Math.floor(currentDate.getHours() / intervals.major.step) * intervals.major.step)
+        break
+      case 'minute':
+        currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), currentDate.getHours(), Math.floor(currentDate.getMinutes() / intervals.major.step) * intervals.major.step)
+        break
+    }
+    
+    // Generate major ticks
+    while (currentDate <= visibleRange.endDate) {
+      const tickPosition = calculateDatePosition(currentDate, REFERENCE_DATE, scale)
+      segments.push({
+        date: new Date(currentDate),
+        label: formatLabel(currentDate, intervals.major.unit, true),
+        position: tickPosition,
+        isMainTick: true,
+        tickHeight: 'large'
+      })
+      currentDate = addTime(currentDate, intervals.major.unit, intervals.major.step)
+    }
+    
+    // Generate minor ticks
+    currentDate = new Date(visibleRange.startDate)
+    
+    // Align to appropriate boundary for minor ticks
+    switch (intervals.minor.unit) {
+      case 'year':
+        currentDate = new Date(Math.floor(currentDate.getFullYear() / intervals.minor.step) * intervals.minor.step, 0, 1)
+        break
+      case 'month':
+        currentDate = new Date(currentDate.getFullYear(), Math.floor(currentDate.getMonth() / intervals.minor.step) * intervals.minor.step, 1)
+        break
+      case 'week':
+        const dayOfWeek = currentDate.getDay()
+        currentDate = addDays(currentDate, -dayOfWeek)
+        break
+      case 'day':
+        currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+        break
+      case 'hour':
+        currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), Math.floor(currentDate.getHours() / intervals.minor.step) * intervals.minor.step)
+        break
+      case 'minute':
+        currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), currentDate.getHours(), Math.floor(currentDate.getMinutes() / intervals.minor.step) * intervals.minor.step)
+        break
+    }
+    
+    while (currentDate <= visibleRange.endDate) {
+      const tickPosition = calculateDatePosition(currentDate, REFERENCE_DATE, scale)
       
-      if (zoomLevel === ZoomLevel.Years) {
-        // For years, show year labels
+      // Only add if not already a major tick
+      const isAlreadyMajor = segments.some(seg => 
+        seg.isMainTick && Math.abs(seg.position - tickPosition) < 1
+      )
+      
+      if (!isAlreadyMajor) {
         segments.push({
-          date: segment.date,
-          label: segment.label,
-          position: segmentPosition,
-          isMainTick: true,
-          tickHeight: 'large'
-        })
-      } else if (zoomLevel === ZoomLevel.Months && segment.months) {
-        // For months, show year and month labels
-        segments.push({
-          date: segment.date,
-          label: segment.label,
-          position: segmentPosition,
-          isMainTick: true,
-          tickHeight: 'large'
-        })
-        
-        let monthCumulativeWidth = 0
-        segment.months.forEach((month) => {
-          const monthPosition = segmentPosition + monthCumulativeWidth
-          segments.push({
-            date: month.date,
-            label: month.label,
-            position: monthPosition,
-            isMainTick: false,
-            tickHeight: 'medium'
-          })
-          monthCumulativeWidth += month.width
-        })
-      } else if (zoomLevel === ZoomLevel.Days) {
-        // For days, show more detailed labels
-        segments.push({
-          date: segment.date,
-          label: format(segment.date, 'MMM d'),
-          position: segmentPosition,
-          isMainTick: true,
+          date: new Date(currentDate),
+          label: formatLabel(currentDate, intervals.minor.unit, false),
+          position: tickPosition,
+          isMainTick: false,
           tickHeight: 'medium'
         })
       }
       
-      cumulativeWidth += segment.width
-    })
-
-    return segments
-  }, [currentTimelineSegments, firstSegmentPosition, zoomLevel])
-
+      currentDate = addTime(currentDate, intervals.minor.unit, intervals.minor.step)
+    }
+    
+    // Sort segments by position
+    return segments.sort((a, b) => a.position - b.position)
+  }, [scale, visibleRange])
+  
   return (
-    <div className="relative h-full bg-white border-b border-slate-200">
+    <div className="relative h-full w-full select-none overflow-hidden">
+      {/* Main ruler line */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-slate-300" />
+      
       {/* Ruler segments */}
-      {rulerSegments.map((segment, index) => (
-        <div
-          key={`ruler-${segment.date.getTime()}-${index}`}
-          className="absolute top-0 flex flex-col items-start"
-          style={{
-            left: `${segment.position}px`,
-            height: '100%',
-          }}
-        >
-          {/* Tick mark */}
+      {rulerSegments.map((segment, index) => {
+        const tickHeight = segment.tickHeight === 'large' ? 'h-4' : 
+                          segment.tickHeight === 'medium' ? 'h-3' : 'h-2'
+        const textSize = segment.isMainTick ? 'text-sm font-medium' : 'text-xs'
+        const textColor = segment.isMainTick ? 'text-slate-700' : 'text-slate-500'
+        
+        return (
           <div
-            className={`border-l ${
-              segment.isMainTick ? 'border-slate-400' : 'border-slate-300'
-            }`}
+            key={`${segment.date.getTime()}-${index}`}
+            className="absolute bottom-0 flex flex-col items-center select-none"
             style={{
-              height: segment.tickHeight === 'large' ? '24px' : segment.tickHeight === 'medium' ? '16px' : '8px',
-              marginTop: segment.tickHeight === 'large' ? '8px' : '16px',
-            }}
-          />
-          
-          {/* Label */}
-          <div
-            className={`text-xs ${
-              segment.isMainTick ? 'text-slate-700 font-medium' : 'text-slate-500'
-            } mt-1 whitespace-nowrap select-none`}
-            style={{
-              marginLeft: '4px',
+              left: `${segment.position}px`,
+              transform: 'translateX(-50%)'
             }}
           >
-            {segment.label}
+            {/* Tick mark */}
+            <div className={`w-px bg-slate-400 ${tickHeight}`} />
+            
+            {/* Label */}
+            <div className={`mt-2 mb-3 px-1 whitespace-nowrap ${textSize} ${textColor} select-none`}>
+              {segment.label}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
