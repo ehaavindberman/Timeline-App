@@ -3,7 +3,6 @@
 import type React from "react";
 import { useEffect, useState } from "react";
 import { useTimelineStore } from "../../store/timelineStore";
-import { ZoomLevel } from "../../utils/timelineSegments";
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
 type TimelineEventProps = {
@@ -17,13 +16,11 @@ type TimelineEventProps = {
     color: string;
   };
   calculateDatePosition: (date: Date) => number;
-  zoomLevel: ZoomLevel;
 };
 
 export const TimelineEvent = ({
   event,
   calculateDatePosition,
-  zoomLevel,
 }: TimelineEventProps) => {
   const { updateEvent, selectElement, selectedElementId } = useTimelineStore();
   const [isDragging, setIsDragging] = useState(false);
@@ -44,7 +41,7 @@ export const TimelineEvent = ({
       x: xPos,
       y: prev.y, // Keep the y position unchanged
     }));
-  }, [event.date, zoomLevel, calculateDatePosition]);
+  }, [event.date, calculateDatePosition]);
 
   // Update y position when event.y changes
   useEffect(() => {

@@ -3,7 +3,6 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import { useTimelineStore } from "../../store/timelineStore"
-import { ZoomLevel } from "../../utils/timelineSegments"
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react"
 
 type TimelineSpanProps = {
@@ -19,10 +18,9 @@ type TimelineSpanProps = {
     color: string
   }
   calculateDatePosition: (date: Date) => number
-  zoomLevel: ZoomLevel
 }
 
-export const TimelineSpan = ({ span, calculateDatePosition, zoomLevel }: TimelineSpanProps) => {
+export const TimelineSpan = ({ span, calculateDatePosition }: TimelineSpanProps) => {
   const { updateSpan, selectElement, selectedElementId } = useTimelineStore()
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
@@ -52,7 +50,7 @@ export const TimelineSpan = ({ span, calculateDatePosition, zoomLevel }: Timelin
       y: prev.y, // Keep the y position unchanged
     }))
     setWidth(newWidth > 0 ? newWidth : 100)
-  }, [span.startDate, span.endDate, zoomLevel, calculateDatePosition])
+  }, [span.startDate, span.endDate, calculateDatePosition])
 
   // Update y position when span.y changes
   useEffect(() => {
