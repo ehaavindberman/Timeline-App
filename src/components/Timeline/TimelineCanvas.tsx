@@ -1,66 +1,60 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useEffect, useState, useRef, useCallback, useMemo } from "react"
-import { useTimelineStore } from "../../store/timelineStore"
-import { TimelineEvent } from "./TimelineEvent"
-import { TimelineSpan } from "./TimelineSpan"
+import type React from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { useTimelineStore } from "../../store/timelineStore";
+import { TimelineEvent } from "./TimelineEvent";
+import { TimelineSpan } from "./TimelineSpan";
 
-import { TimelineControls } from "./TimelineControls"
-import { OffscreenIndicators } from "./OffscreenIndicators"
-import { centerOnElement as centerOnElementUtil } from "../../utils/timelineUtils"
-import { TimelineRuler } from "./TimelineRuler"
-import { TimelineRulerIndicators } from "./TimelineRulerIndicators"
-import { TimelineGuidelines } from "./TimelineGuidelines"
-import { useOffscreenElements } from "../../hooks/useOffscreenElements"
+import { TimelineControls } from "./TimelineControls";
+import { OffscreenIndicators } from "./OffscreenIndicators";
+import { centerOnElement as centerOnElementUtil } from "../../utils/timelineUtils";
+import { TimelineRuler } from "./TimelineRuler";
+import { TimelineRulerIndicators } from "./TimelineRulerIndicators";
+import { TimelineGuidelines } from "./TimelineGuidelines";
+import { useOffscreenElements } from "../../hooks/useOffscreenElements";
 import {
   positionToDate as positionToDateUtil,
   calculateDatePosition as calculateDatePositionUtil,
   REFERENCE_DATE,
-} from "../../utils/timelineCalculations"
-
-
+} from "../../utils/timelineCalculations";
 
 // Default center date for initial view
-const DEFAULT_CENTER_DATE = new Date(2023, 4, 12) // April 12, 2023
-
-
+const DEFAULT_CENTER_DATE = new Date(2023, 4, 12); // April 12, 2023
 
 export const TimelineCanvas = () => {
-  const { events, spans, addEvent, selectElement } = useTimelineStore()
-  const [scale, setScale] = useState(5) // Start at year level (5 pixels per day)
-  const [position, setPosition] = useState(0) // horizontal scroll position
-  const [isDragging, setIsDragging] = useState(false)
-  const [startDragX, setStartDragX] = useState(0)
-  const [startPosition, setStartPosition] = useState(0)
-  const [isInitialized, setIsInitialized] = useState(false) // Track if initial positioning is done
+  const { events, spans, addEvent, selectElement } = useTimelineStore();
+  const [scale, setScale] = useState(5); // Start at year level (5 pixels per day)
+  const [position, setPosition] = useState(0); // horizontal scroll position
+  const [isDragging, setIsDragging] = useState(false);
+  const [startDragX, setStartDragX] = useState(0);
+  const [startPosition, setStartPosition] = useState(0);
+  const [isInitialized, setIsInitialized] = useState(false); // Track if initial positioning is done
 
-  const canvasRef = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Convert position to date based on reference date
   const positionToDate = useCallback(
     (xPos: number): Date => {
-      return positionToDateUtil(xPos, scale)
+      return positionToDateUtil(xPos, scale);
     },
     [scale],
-  )
-
-  
+  );
 
   // Calculate the visible date range based on current position and canvas width
   const getVisibleDateRange = useCallback(() => {
-    const fallbackWidth = 1200
-    const canvasWidth = canvasRef.current?.clientWidth || fallbackWidth
-    const buffer = Math.max(canvasWidth * 2, 2400)
+    const fallbackWidth = 1200;
+    const canvasWidth = canvasRef.current?.clientWidth || fallbackWidth;
+    const buffer = Math.max(canvasWidth * 2, 2400);
 
     // FIXED: Calculate the absolute timeline positions correctly
     // position is the CSS transform offset, so we need to convert to absolute timeline coordinates
-    const viewportLeftEdge = -position // Left edge of visible area in timeline coordinates
-    const viewportRightEdge = -position + canvasWidth // Right edge of visible area
+    const viewportLeftEdge = -position; // Left edge of visible area in timeline coordinates
+    const viewportRightEdge = -position + canvasWidth; // Right edge of visible area
 
     // Add buffer to get the range we need to generate segments for
-    const visibleStartX = viewportLeftEdge - buffer
-    const visibleEndX = viewportRightEdge + buffer
+    const visibleStartX = viewportLeftEdge - buffer;
+    const visibleEndX = viewportRightEdge + buffer;
 
     console.log("📍 FIXED getVisibleDateRange Debug:", {
       position: Math.round(position),
@@ -71,14 +65,14 @@ export const TimelineCanvas = () => {
       visibleStartX: Math.round(visibleStartX),
       visibleEndX: Math.round(visibleEndX),
       viewportCenter: Math.round(viewportLeftEdge + canvasWidth / 2),
-    })
+    });
 
-    const startDate = positionToDate(visibleStartX)
-    const endDate = positionToDate(visibleEndX)
+    const startDate = positionToDate(visibleStartX);
+    const endDate = positionToDate(visibleEndX);
 
     // Verify the center calculation
-    const centerX = viewportLeftEdge + canvasWidth / 2
-    const centerDate = positionToDate(centerX)
+    const centerX = viewportLeftEdge + canvasWidth / 2;
+    const centerDate = positionToDate(centerX);
 
     console.log("📅 Date Range Verification:", {
       startDate: startDate.toISOString(),
@@ -86,35 +80,34 @@ export const TimelineCanvas = () => {
       centerX: Math.round(centerX),
       centerDate: centerDate.toISOString(),
       expectedCenter: "Should be around April 2023 initially",
-    })
+    });
 
-    return { startDate, endDate, canvasWidth, buffer }
-  }, [position, positionToDate, scale])
+    return { startDate, endDate, canvasWidth, buffer };
+  }, [position, positionToDate, scale]);
 
   // Generate timeline segments based on visible range
-
 
   // Calculate date position based on reference date
   const calculateDatePosition = useCallback(
     (date: Date): number => {
-      return calculateDatePositionUtil(date, scale)
+      return calculateDatePositionUtil(date, scale);
     },
     [scale],
-  )
+  );
 
   // Initialize the timeline position to center on DEFAULT_CENTER_DATE
   useEffect(() => {
     if (canvasRef.current && !isInitialized) {
-      const canvasWidth = canvasRef.current.clientWidth
-      const centerX = canvasWidth / 2
+      const canvasWidth = canvasRef.current.clientWidth;
+      const centerX = canvasWidth / 2;
 
       // Calculate position of DEFAULT_CENTER_DATE
-      const centerDatePosition = calculateDatePosition(DEFAULT_CENTER_DATE)
+      const centerDatePosition = calculateDatePosition(DEFAULT_CENTER_DATE);
 
       // Set position to center the default date
-      const initialPosition = centerX - centerDatePosition
-      setPosition(initialPosition)
-      setIsInitialized(true)
+      const initialPosition = centerX - centerDatePosition;
+      setPosition(initialPosition);
+      setIsInitialized(true);
 
       console.log("🎯 Initial Positioning:", {
         canvasWidth,
@@ -123,71 +116,69 @@ export const TimelineCanvas = () => {
         centerDatePosition: Math.round(centerDatePosition),
         initialPosition: Math.round(initialPosition),
         verification: "Center should be at DEFAULT_CENTER_DATE",
-      })
+      });
     }
-  }, [calculateDatePosition, isInitialized])
-
-  
+  }, [calculateDatePosition, isInitialized]);
 
   // Snap x position to nearest day based on scale
   const snapToGrid = useCallback(
     (xPos: number): number => {
-      return Math.round(xPos / scale) * scale
+      return Math.round(xPos / scale) * scale;
     },
     [scale],
-  )
+  );
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault() // Prevent text selection
-    setIsDragging(true)
-    setStartDragX(e.clientX)
-    setStartPosition(position)
-  }
+    e.preventDefault(); // Prevent text selection
+    setIsDragging(true);
+    setStartDragX(e.clientX);
+    setStartPosition(position);
+  };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging) {
-      const deltaX = e.clientX - startDragX
-      const newPosition = startPosition + deltaX
-      setPosition(newPosition) // No bounds checking for infinite scroll
+      const deltaX = e.clientX - startDragX;
+      const newPosition = startPosition + deltaX;
+      setPosition(newPosition); // No bounds checking for infinite scroll
     }
-  }
+  };
 
   const handleMouseUp = () => {
-    setIsDragging(false)
-  }
+    setIsDragging(false);
+  };
 
   // Get current viewport center
   const getCurrentViewportCenter = useCallback(() => {
     if (canvasRef.current) {
-      const canvasWidth = canvasRef.current.clientWidth
-      const centerX = canvasWidth / 2
+      const canvasWidth = canvasRef.current.clientWidth;
+      const centerX = canvasWidth / 2;
 
       // Calculate the absolute timeline position at the center of the viewport
-      const absoluteXAtCenter = -position + centerX
+      const absoluteXAtCenter = -position + centerX;
 
       // Convert to date
-      const centerDate = positionToDate(absoluteXAtCenter)
+      const centerDate = positionToDate(absoluteXAtCenter);
 
       return {
         date: centerDate,
         x: absoluteXAtCenter,
-      }
+      };
     }
 
     // Fallback
     return {
       date: new Date(),
       x: 0,
-    }
-  }, [position, positionToDate])
+    };
+  }, [position, positionToDate]);
 
   // Handle double click to add event
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect()
-      const rawX = e.clientX - rect.left - position
-      const x = snapToGrid(rawX) // Snap to grid
-      const date = positionToDate(x)
+      const rect = canvasRef.current.getBoundingClientRect();
+      const rawX = e.clientX - rect.left - position;
+      const x = snapToGrid(rawX); // Snap to grid
+      const date = positionToDate(x);
       addEvent({
         id: `event-${Date.now()}`,
         title: `🌿 New Nature Event`,
@@ -196,103 +187,106 @@ export const TimelineCanvas = () => {
         x: x,
         y: 100, // Default y position
         color: "#10b981",
-      })
+      });
     }
-  }
+  };
 
   const handleZoom = (factor: number) => {
     if (canvasRef.current) {
-      const currentCanvasWidth = canvasRef.current.clientWidth
-      const centerX = currentCanvasWidth / 2
+      const currentCanvasWidth = canvasRef.current.clientWidth;
+      const centerX = currentCanvasWidth / 2;
 
       // 1. Calculate the absolute pixel position under the current canvas center
-      const absoluteXAtCurrentCenter = -position + centerX
+      const absoluteXAtCurrentCenter = -position + centerX;
 
       // 2. Convert this absolute pixel position to a date BEFORE zooming
-      const dateUnderCenter = positionToDate(absoluteXAtCurrentCenter)
+      const dateUnderCenter = positionToDate(absoluteXAtCurrentCenter);
 
       // 3. Determine the new scale
-      const targetScale = scale * factor
-      const newScale = Math.max(1, Math.min(1000, targetScale)) // Increased max scale for infinite scroll
+      const targetScale = scale * factor;
+      const newScale = Math.max(1, Math.min(1000, targetScale)); // Increased max scale for infinite scroll
 
       // 4. Update scale
-      setScale(newScale)
+      setScale(newScale);
 
       // 5. Calculate the absolute X position of `dateUnderCenter` with the new scale
-      const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime()
-      const diffDays = diffTime / (1000 * 60 * 60 * 24)
+      const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
       // Simplified: scale is always pixels per day
-      const absoluteXForCenteredDateAtNewScale = diffDays * newScale
+      const absoluteXForCenteredDateAtNewScale = diffDays * newScale;
 
       // 6. Calculate the new scroll position to keep `dateUnderCenter` at `centerX`
-      const newPosition = centerX - absoluteXForCenteredDateAtNewScale
+      const newPosition = centerX - absoluteXForCenteredDateAtNewScale;
 
       // 7. Apply the new position
-      setPosition(newPosition)
+      setPosition(newPosition);
     }
-  }
+  };
 
   // Zoom preset methods
-  const setPresetZoom = useCallback((level: 'day' | 'month' | 'year') => {
-    if (canvasRef.current) {
-      const currentCanvasWidth = canvasRef.current.clientWidth
-      const centerX = currentCanvasWidth / 2
-      
-      // Get the date currently at the center
-      const absoluteXAtCurrentCenter = -position + centerX
-      const dateUnderCenter = positionToDate(absoluteXAtCurrentCenter)
-      
-      // Set the appropriate scale for each zoom level
-      let newScale: number
-      
-      switch (level) {
-        case 'day':
-          newScale = 100 // High scale for day view
-          break
-        case 'month':
-          newScale = 20 // Medium scale for month view  
-          break
-        case 'year':
-          newScale = 5 // Low scale for year view
-          break
-        default:
-          return
+  const setPresetZoom = useCallback(
+    (level: "day" | "month" | "year") => {
+      if (canvasRef.current) {
+        const currentCanvasWidth = canvasRef.current.clientWidth;
+        const centerX = currentCanvasWidth / 2;
+
+        // Get the date currently at the center
+        const absoluteXAtCurrentCenter = -position + centerX;
+        const dateUnderCenter = positionToDate(absoluteXAtCurrentCenter);
+
+        // Set the appropriate scale for each zoom level
+        let newScale: number;
+
+        switch (level) {
+          case "day":
+            newScale = 100; // High scale for day view
+            break;
+          case "month":
+            newScale = 20; // Medium scale for month view
+            break;
+          case "year":
+            newScale = 5; // Low scale for year view
+            break;
+          default:
+            return;
+        }
+
+        // Update scale
+        setScale(newScale);
+
+        // Calculate new position to keep the same date centered
+        const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime();
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+        // Simplified: scale is always pixels per day
+        const absoluteXForCenteredDateAtNewScale = diffDays * newScale;
+
+        const newPosition = centerX - absoluteXForCenteredDateAtNewScale;
+        setPosition(newPosition);
       }
-      
-      // Update scale
-      setScale(newScale)
-      
-      // Calculate new position to keep the same date centered
-      const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime()
-      const diffDays = diffTime / (1000 * 60 * 60 * 24)
-      
-      // Simplified: scale is always pixels per day
-      const absoluteXForCenteredDateAtNewScale = diffDays * newScale
-      
-      const newPosition = centerX - absoluteXForCenteredDateAtNewScale
-      setPosition(newPosition)
-    }
-  }, [position, positionToDate])
+    },
+    [position, positionToDate],
+  );
 
   // Expose timeline methods globally for toolbar access
   useEffect(() => {
-    ;(window as any).timelineConfig = {
+    (window as any).timelineConfig = {
       setPresetZoom,
       getCurrentViewportCenter,
       calculateDatePosition,
-    }
-    
+    };
+
     return () => {
-      delete (window as any).timelineConfig
-    }
-  }, [setPresetZoom, getCurrentViewportCenter, calculateDatePosition])
+      delete (window as any).timelineConfig;
+    };
+  }, [setPresetZoom, getCurrentViewportCenter, calculateDatePosition]);
 
   // Center on a specific element by ID
   const centerOnElement = useCallback(
     (elementId: string) => {
       if (canvasRef.current) {
-        const canvasWidth = canvasRef.current.clientWidth
+        const canvasWidth = canvasRef.current.clientWidth;
         centerOnElementUtil(
           elementId,
           events,
@@ -300,16 +294,16 @@ export const TimelineCanvas = () => {
           calculateDatePosition,
           setPosition,
           selectElement,
-          canvasWidth
-        )
+          canvasWidth,
+        );
       }
     },
     [events, spans, calculateDatePosition, selectElement],
-  )
+  );
 
   // Add to global window so other components can access it
   useEffect(() => {
-    ;(window as any).timelineConfig = {
+    (window as any).timelineConfig = {
       scale,
       referenceDate: REFERENCE_DATE,
       positionToDate: positionToDate,
@@ -317,7 +311,7 @@ export const TimelineCanvas = () => {
       centerOnElement,
       setPresetZoom,
       getCurrentViewportCenter,
-    }
+    };
   }, [
     scale,
     positionToDate,
@@ -325,7 +319,7 @@ export const TimelineCanvas = () => {
     centerOnElement,
     setPresetZoom,
     getCurrentViewportCenter,
-  ])
+  ]);
 
   // Calculate off-screen elements using custom hook
   const offscreenElements = useOffscreenElements({
@@ -335,10 +329,9 @@ export const TimelineCanvas = () => {
     canvasRef,
     calculateDatePosition,
     scale,
-  })
+  });
 
   // Render the appropriate timeline ruler based on zoom level
-
 
   return (
     <div className="relative flex-1 overflow-hidden bg-white select-none">
@@ -348,7 +341,10 @@ export const TimelineCanvas = () => {
         onScrollLeft={() => setPosition(position + 500)}
         onScrollRight={() => setPosition(position - 500)}
       />
-      <OffscreenIndicators offscreenElements={offscreenElements} onCenterElement={centerOnElement} />
+      <OffscreenIndicators
+        offscreenElements={offscreenElements}
+        onCenterElement={centerOnElement}
+      />
       <div
         id="timeline-canvas"
         ref={canvasRef}
@@ -367,15 +363,14 @@ export const TimelineCanvas = () => {
           style={{
             width: "100%",
             transform: `translateX(${position}px)`,
-            transition: isDragging ? "none" : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: isDragging
+              ? "none"
+              : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
           {/* Timeline ruler */}
           <div className="sticky top-0 z-10 h-16 bg-white border-b border-slate-200 select-none">
-            <TimelineRuler
-              scale={scale}
-              position={position}
-            />
+            <TimelineRuler scale={scale} position={position} />
           </div>
           {/* Timeline ruler indicators */}
           <TimelineRulerIndicators
@@ -409,5 +404,5 @@ export const TimelineCanvas = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
