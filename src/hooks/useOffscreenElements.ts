@@ -1,7 +1,6 @@
 
 import { useMemo } from "react"
 import type { TimelineEvent, TimelineSpan } from "../store/timelineStore"
-import type { ZoomLevel } from "../utils/timelineSegments"
 
 interface UseOffscreenElementsProps {
   events: TimelineEvent[]
@@ -10,7 +9,6 @@ interface UseOffscreenElementsProps {
   canvasRef: React.RefObject<HTMLDivElement>
   calculateDatePosition: (date: Date) => number
   scale: number
-  zoomLevel: ZoomLevel
 }
 
 export interface OffscreenElement {
@@ -34,7 +32,6 @@ export const useOffscreenElements = ({
   canvasRef,
   calculateDatePosition,
   scale,
-  zoomLevel,
 }: UseOffscreenElementsProps): OffscreenElementsResult => {
   return useMemo(() => {
     if (!canvasRef.current) return { left: [], right: [] }
