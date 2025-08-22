@@ -1,0 +1,104 @@
+📍 FIXED getVisibleDateRange Debug: {
+  position: 0,
+  canvasWidth: 1200,
+  buffer: 2400,
+  viewportLeftEdge: -0,
+  viewportRightEdge: 1200,
+  visibleStartX: -2400,
+  visibleEndX: 3600,
+  viewportCenter: 600
+}
+📅 Date Range Verification: {
+  startDate: '2021-09-08T00:00:00.000Z',
+  endDate: '2024-12-21T00:00:00.000Z',
+  centerX: 600,
+  centerDate: '2023-05-01T00:00:00.000Z',
+  expectedCenter: 'Should be around April 2023 initially'
+}
+🔍 generateTimelineSegments Debug
+  📊 Input Parameters: {
+    currentScale: 5,
+    currentZoomLevel: 'Years',
+    startDate: '2021-09-08T00:00:00.000Z',
+    endDate: '2024-12-21T00:00:00.000Z',
+    dateRange: '1200 days'
+  }
+  📐 Pixels per day: 0.25
+  📅 Years Level - Extended Range: {
+    originalStart: '2021-09-08T00:00:00.000Z',
+    extendedStart: '2011-01-01T00:00:00.000Z',
+    originalEnd: '2024-12-21T00:00:00.000Z',
+    extendedEnd: '2034-12-19T00:00:00.000Z',
+    bufferYears: 10
+  }
+  📊 Year Segment 0: {
+    label: '2011',
+    width: 91,
+    days: 365,
+    date: '2011-01-01T00:00:00.000Z'
+  }
+  📊 Year Segment 1: {
+    label: '2012',
+    width: 92,
+    days: 366,
+    date: '2012-01-01T00:00:00.000Z'
+  }
+  📊 Year Segment 2: {
+    label: '2013',
+    width: 91,
+    days: 365,
+    date: '2013-01-01T00:00:00.000Z'
+  }
+  📊 Year Segment 3: {
+    label: '2014',
+    width: 91,
+    days: 365,
+    date: '2014-01-01T00:00:00.000Z'
+  }
+  📊 Year Segment 4: {
+    label: '2015',
+    width: 91,
+    days: 365,
+    date: '2015-01-01T00:00:00.000Z'
+  }
+  📊 Year Segment 5: {
+    label: '2016',
+    width: 92,
+    days: 366,
+    date: '2016-01-01T00:00:00.000Z'
+  }
+  📊 Year Segment 10: {
+    label: '2021',
+    width: 91,
+    days: 365,
+    date: '2021-01-01T00:00:00.000Z'
+  }
+  📊 Year Segment 15: {
+    label: '2026',
+    width: 91,
+    days: 365,
+    date: '2026-01-01T00:00:00.000Z'
+  }
+  📊 Year Segment 20: {
+    label: '2031',
+    width: 91,
+    days: 365,
+    date: '2031-01-01T00:00:00.000Z'
+  }
+  ✅ Years Level - Generated 24 year segments
+  📏 Coverage Analysis: {
+    totalSegments: 24,
+    totalWidth: 2192,
+    firstSegmentDate: '2011-01-01T00:00:00.000Z',
+    lastSegmentDate: '2034-01-01T00:00:00.000Z',
+    firstSegmentLabel: '2011',
+    lastSegmentLabel: '2034',
+    averageSegmentWidth: 91
+  }
+🎯 First Segment Positioning: {
+  firstSegmentDate: '2011-01-01T00:00:00.000Z',
+  firstSegmentPosition: -21915,
+  currentPosition: 0,
+  viewportCenter: 600,
+  centerDate: '2023-05-01T00:00:00.000Z'
+}
