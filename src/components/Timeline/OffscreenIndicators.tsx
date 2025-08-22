@@ -2,6 +2,10 @@
 
 interface OffscreenElement {
   id: string
+  title: string
+  type: 'event' | 'span'
+  direction: 'left' | 'right'
+  distance: number
   color: string
 }
 
