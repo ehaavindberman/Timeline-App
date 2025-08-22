@@ -1,97 +1,101 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useEffect, useState } from "react"
-import { useTimelineStore } from "../../store/timelineStore"
-import { ZoomLevel } from "../../utils/timelineSegments"
-import { ChevronDownIcon, ChevronUpIcon } from "lucide-react"
+import type React from "react";
+import { useEffect, useState } from "react";
+import { useTimelineStore } from "../../store/timelineStore";
+import { ZoomLevel } from "../../utils/timelineSegments";
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
 type TimelineEventProps = {
   event: {
-    id: string
-    title: string
-    description: string
-    date: string
-    x: number
-    y: number
-    color: string
-  }
-  calculateDatePosition: (date: Date) => number
-  zoomLevel: ZoomLevel
-}
+    id: string;
+    title: string;
+    description: string;
+    date: string;
+    x: number;
+    y: number;
+    color: string;
+  };
+  calculateDatePosition: (date: Date) => number;
+  zoomLevel: ZoomLevel;
+};
 
-export const TimelineEvent = ({ event, calculateDatePosition, zoomLevel }: TimelineEventProps) => {
-  const { updateEvent, selectElement, selectedElementId } = useTimelineStore()
-  const [isDragging, setIsDragging] = useState(false)
-  const [isDateLocked, setIsDateLocked] = useState(false)
-  const [showDescription, setShowDescription] = useState(false)
-  const [startX, setStartX] = useState(0)
-  const [startY, setStartY] = useState(0)
+export const TimelineEvent = ({
+  event,
+  calculateDatePosition,
+  zoomLevel,
+}: TimelineEventProps) => {
+  const { updateEvent, selectElement, selectedElementId } = useTimelineStore();
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDateLocked, setIsDateLocked] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
   const [position, setPosition] = useState({
     x: event.x,
     y: event.y,
-  })
+  });
 
   // Update position based on date when zoom level changes (only x position)
   useEffect(() => {
-    const eventDate = new Date(event.date)
-    const xPos = calculateDatePosition(eventDate)
+    const eventDate = new Date(event.date);
+    const xPos = calculateDatePosition(eventDate);
     setPosition((prev) => ({
       x: xPos,
       y: prev.y, // Keep the y position unchanged
-    }))
-  }, [event.date, zoomLevel, calculateDatePosition])
+    }));
+  }, [event.date, zoomLevel, calculateDatePosition]);
 
   // Update y position when event.y changes
   useEffect(() => {
     setPosition((prev) => ({
       ...prev,
       y: event.y,
-    }))
-  }, [event.y])
+    }));
+  }, [event.y]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault() // Prevent text selection
-    setIsDragging(true)
-    setStartX(e.clientX)
-    setStartY(e.clientY)
-    selectElement(event.id)
+    e.stopPropagation();
+    e.preventDefault(); // Prevent text selection
+    setIsDragging(true);
+    setStartX(e.clientX);
+    setStartY(e.clientY);
+    selectElement(event.id);
 
     // Check if Shift is held to lock the date
-    setIsDateLocked(e.shiftKey)
-  }
+    setIsDateLocked(e.shiftKey);
+  };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isDragging) {
-      const deltaX = e.clientX - startX
-      const deltaY = e.clientY - startY
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
 
-      const newPosition = { ...position }
+      const newPosition = { ...position };
 
       // Always allow vertical movement
-      newPosition.y = Math.max(50, position.y + deltaY)
+      newPosition.y = Math.max(50, position.y + deltaY);
 
       // Only allow horizontal movement if date is not locked
       if (!isDateLocked) {
-        newPosition.x = position.x + deltaX
+        newPosition.x = position.x + deltaX;
       }
 
-      setPosition(newPosition)
-      setStartX(e.clientX)
-      setStartY(e.clientY)
+      setPosition(newPosition);
+      setStartX(e.clientX);
+      setStartY(e.clientY);
     }
-  }
+  };
 
   const handleMouseUp = () => {
     if (isDragging) {
-      const timelineConfig = (window as any).timelineConfig
+      const timelineConfig = (window as any).timelineConfig;
       if (timelineConfig) {
-        let newDate = new Date(event.date)
+        let newDate = new Date(event.date);
 
         // Only update date if it wasn't locked during drag
         if (!isDateLocked && timelineConfig.positionToDate) {
-          newDate = timelineConfig.positionToDate(position.x)
+          newDate = timelineConfig.positionToDate(position.x);
         }
 
         // Update the event with new position and potentially new date
@@ -100,37 +104,37 @@ export const TimelineEvent = ({ event, calculateDatePosition, zoomLevel }: Timel
           x: position.x,
           y: position.y,
           date: newDate.toISOString(),
-        })
+        });
       }
     }
-    setIsDragging(false)
-    setIsDateLocked(false)
-  }
+    setIsDragging(false);
+    setIsDateLocked(false);
+  };
 
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
-    selectElement(event.id)
-  }
+    e.stopPropagation();
+    e.preventDefault();
+    selectElement(event.id);
+  };
 
   const handleToggleDescription = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
-    setShowDescription(!showDescription)
-  }
+    e.stopPropagation();
+    e.preventDefault();
+    setShowDescription(!showDescription);
+  };
 
   useEffect(() => {
     if (isDragging) {
-      document.addEventListener("mousemove", handleMouseMove as any)
-      document.addEventListener("mouseup", handleMouseUp)
+      document.addEventListener("mousemove", handleMouseMove as any);
+      document.addEventListener("mouseup", handleMouseUp);
       return () => {
-        document.removeEventListener("mousemove", handleMouseMove as any)
-        document.removeEventListener("mouseup", handleMouseUp)
-      }
+        document.removeEventListener("mousemove", handleMouseMove as any);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
     }
-  }, [isDragging, position, isDateLocked])
+  }, [isDragging, position, isDateLocked]);
 
-  const isSelected = selectedElementId === event.id
+  const isSelected = selectedElementId === event.id;
 
   return (
     <div
@@ -151,10 +155,12 @@ export const TimelineEvent = ({ event, calculateDatePosition, zoomLevel }: Timel
         className="absolute w-3 h-3 rounded-full bg-white border-2 left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
         style={{
           borderColor: event.color,
+          top: "0",
         }}
       />
       {/* Vertical line from circle down to card */}
-      <div className="absolute w-px h-5 bg-slate-300 left-1/2 top-0 mt-1.5 pointer-events-none" /> {/* mt-1.5 is 6px */}
+      <div className="absolute w-px h-5 bg-slate-300 left-1/2 top-0 mt-1.5 pointer-events-none" />{" "}
+      {/* mt-1.5 is 6px */}
       {/* Info card */}
       <div
         className={`absolute flex flex-col min-w-[150px] max-w-[250px] rounded-md shadow-md transition-shadow select-none ${
@@ -165,21 +171,29 @@ export const TimelineEvent = ({ event, calculateDatePosition, zoomLevel }: Timel
           // Position relative to the main container's top (which is position.y)
           // Circle is 12px high, line is 20px high, plus 6px margin for line, plus 4px margin for card
           // Total offset: 6px (half circle) + 6px (line margin) + 20px (line height) + 4px (card margin) = 36px
-          top: "36px", // This will place it below the circle and line
+          top: "25px", // This will place it below the circle and line
           left: "50%", // Center horizontally relative to parent
           transform: "translateX(-50%)", // Adjust for its own width
         }}
       >
         <div className="px-3 py-2 bg-white rounded-t-md">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-slate-800 pointer-events-none select-none flex-1">{event.title}</h3>
+            <h3 className="text-sm font-medium text-slate-800 pointer-events-none select-none flex-1">
+              {event.title}
+            </h3>
             {event.description && (
               <button
                 onClick={handleToggleDescription}
                 className="ml-2 p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-                title={showDescription ? "Hide description" : "Show description"}
+                title={
+                  showDescription ? "Hide description" : "Show description"
+                }
               >
-                {showDescription ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
+                {showDescription ? (
+                  <ChevronUpIcon size={14} />
+                ) : (
+                  <ChevronDownIcon size={14} />
+                )}
               </button>
             )}
           </div>
@@ -202,5 +216,5 @@ export const TimelineEvent = ({ event, calculateDatePosition, zoomLevel }: Timel
         </div>
       )}
     </div>
-  )
-}
+  );
+};
