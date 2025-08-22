@@ -28,6 +28,7 @@ localPort = 3004
 externalPort = 3000
 
 [workflows]
+runButton = "Install and run"
 
 [[workflows.workflow]]
 name = "Install and run"
