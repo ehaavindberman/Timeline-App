@@ -1,31 +1,26 @@
-import { useEffect, useState } from "react"
+
+import { useMemo } from "react"
 import type { TimelineEvent, TimelineSpan } from "../store/timelineStore"
-
-// Type for offscreen element data
-export type OffscreenElement = {
-  id: string
-  color: string
-}
-
-export type OffscreenElements = {
-  left: OffscreenElement[]
-  right: OffscreenElement[]
-}
+import type { ZoomLevel } from "../utils/timelineSegments"
 
 interface UseOffscreenElementsProps {
   events: TimelineEvent[]
   spans: TimelineSpan[]
   position: number
-  canvasRef: React.RefObject<HTMLDivElement | null>
+  canvasRef: React.RefObject<HTMLDivElement>
   calculateDatePosition: (date: Date) => number
   scale: number
-  zoomLevel: number
+  zoomLevel: ZoomLevel
 }
 
-/**
- * Custom hook to calculate which timeline elements are offscreen (outside the visible viewport)
- * Returns the offscreen elements categorized by left and right sides
- */
+export interface OffscreenElement {
+  id: string
+  title: string
+  type: 'event' | 'span'
+  direction: 'left' | 'right'
+  distance: number
+}
+
 export const useOffscreenElements = ({
   events,
   spans,
@@ -34,63 +29,71 @@ export const useOffscreenElements = ({
   calculateDatePosition,
   scale,
   zoomLevel,
-}: UseOffscreenElementsProps): OffscreenElements => {
-  const [offscreenElements, setOffscreenElements] = useState<OffscreenElements>({
-    left: [],
-    right: [],
-  })
+}: UseOffscreenElementsProps): OffscreenElement[] => {
+  return useMemo(() => {
+    if (!canvasRef.current) return []
 
-  useEffect(() => {
-    if (!canvasRef.current) return
-
-    const canvasRect = canvasRef.current.getBoundingClientRect()
-    const visibleLeftEdge = -position
-    const visibleRightEdge = -position + canvasRect.width
-    const leftOffscreen: OffscreenElement[] = []
-    const rightOffscreen: OffscreenElement[] = []
+    const canvasWidth = canvasRef.current.clientWidth
+    const viewportLeft = -position
+    const viewportRight = viewportLeft + canvasWidth
+    const offscreenElements: OffscreenElement[] = []
 
     // Check events
     events.forEach((event) => {
-      const eventX = calculateDatePosition(new Date(event.date))
-      if (eventX < visibleLeftEdge) {
-        leftOffscreen.push({
+      const eventDate = new Date(event.date)
+      const eventPosition = calculateDatePosition(eventDate)
+
+      if (eventPosition < viewportLeft) {
+        // Element is off-screen to the left
+        offscreenElements.push({
           id: event.id,
-          color: event.color,
+          title: event.title,
+          type: 'event',
+          direction: 'left',
+          distance: Math.round((viewportLeft - eventPosition) / scale), // Distance in days
         })
-      } else if (eventX > visibleRightEdge) {
-        rightOffscreen.push({
+      } else if (eventPosition > viewportRight) {
+        // Element is off-screen to the right
+        offscreenElements.push({
           id: event.id,
-          color: event.color,
+          title: event.title,
+          type: 'event',
+          direction: 'right',
+          distance: Math.round((eventPosition - viewportRight) / scale), // Distance in days
         })
       }
     })
 
     // Check spans
     spans.forEach((span) => {
-      const spanStartX = calculateDatePosition(new Date(span.startDate))
-      const spanEndX = calculateDatePosition(new Date(span.endDate))
-      
-      // If the span is completely off-screen to the left
-      if (spanEndX < visibleLeftEdge) {
-        leftOffscreen.push({
+      const startDate = new Date(span.startDate)
+      const endDate = new Date(span.endDate)
+      const startPosition = calculateDatePosition(startDate)
+      const endPosition = calculateDatePosition(endDate)
+
+      // Check if entire span is off-screen
+      if (endPosition < viewportLeft) {
+        // Span is entirely off-screen to the left
+        offscreenElements.push({
           id: span.id,
-          color: span.color,
+          title: span.title,
+          type: 'span',
+          direction: 'left',
+          distance: Math.round((viewportLeft - endPosition) / scale), // Distance in days
         })
-      }
-      // If the span is completely off-screen to the right
-      else if (spanStartX > visibleRightEdge) {
-        rightOffscreen.push({
+      } else if (startPosition > viewportRight) {
+        // Span is entirely off-screen to the right
+        offscreenElements.push({
           id: span.id,
-          color: span.color,
+          title: span.title,
+          type: 'span',
+          direction: 'right',
+          distance: Math.round((startPosition - viewportRight) / scale), // Distance in days
         })
       }
     })
 
-    setOffscreenElements({
-      left: leftOffscreen,
-      right: rightOffscreen,
-    })
-  }, [events, spans, position, scale, zoomLevel, calculateDatePosition])
-
-  return offscreenElements
+    // Sort by distance (closest first)
+    return offscreenElements.sort((a, b) => a.distance - b.distance)
+  }, [events, spans, position, canvasRef, calculateDatePosition, scale])
 }

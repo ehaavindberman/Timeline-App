@@ -4,22 +4,15 @@ import { ZoomLevel } from "./timelineSegments"
 export const REFERENCE_DATE = new Date(2023, 0, 1) // Jan 1, 2023
 
 /**
- * Converts a pixel position to a date based on the reference date and current scale/zoom level
+ * Converts a pixel position to a date based on the reference date and current scale
  * @param xPos - The x position in pixels
- * @param scale - The current scale value
- * @param zoomLevel - The current zoom level
+ * @param scale - The current scale value (pixels per day)
+ * @param zoomLevel - The current zoom level (for compatibility, not used in calculation)
  * @returns The corresponding Date object
  */
-export const positionToDate = (xPos: number, scale: number, zoomLevel: ZoomLevel): Date => {
-  let dayOffset: number
-
-  if (zoomLevel === ZoomLevel.Days) {
-    dayOffset = xPos / scale
-  } else if (zoomLevel === ZoomLevel.Months) {
-    dayOffset = xPos / (scale / 5)
-  } else {
-    dayOffset = xPos / (scale / 20)
-  }
+export const positionToDate = (xPos: number, scale: number, zoomLevel?: ZoomLevel): Date => {
+  // Simplified: scale is always pixels per day
+  const dayOffset = xPos / scale
 
   // Use more precise date calculation
   const millisecondsOffset = dayOffset * 24 * 60 * 60 * 1000
@@ -27,28 +20,23 @@ export const positionToDate = (xPos: number, scale: number, zoomLevel: ZoomLevel
 }
 
 /**
- * Converts a date to a pixel position based on the reference date and current scale/zoom level
+ * Converts a date to a pixel position based on the reference date and current scale
  * @param date - The date to convert
- * @param scale - The current scale value
- * @param zoomLevel - The current zoom level
+ * @param scale - The current scale value (pixels per day)
+ * @param zoomLevel - The current zoom level (for compatibility, not used in calculation)
  * @returns The corresponding x position in pixels
  */
-export const calculateDatePosition = (date: Date, scale: number, zoomLevel: ZoomLevel): number => {
+export const calculateDatePosition = (date: Date, scale: number, zoomLevel?: ZoomLevel): number => {
   const diffTime = date.getTime() - REFERENCE_DATE.getTime()
   const diffDays = diffTime / (1000 * 60 * 60 * 24) // More precise - don't round here
 
-  if (zoomLevel === ZoomLevel.Days) {
-    return diffDays * scale
-  } else if (zoomLevel === ZoomLevel.Months) {
-    return diffDays * (scale / 5)
-  } else {
-    return diffDays * (scale / 20)
-  }
+  // Simplified: scale is always pixels per day
+  return diffDays * scale
 }
 
 /**
  * Determines the appropriate zoom level based on the current scale value
- * @param currentScale - The current scale value
+ * @param currentScale - The current scale value (pixels per day)
  * @returns The corresponding ZoomLevel
  */
 export const getZoomLevelFromScale = (currentScale: number): ZoomLevel => {

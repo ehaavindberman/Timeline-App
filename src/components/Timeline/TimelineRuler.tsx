@@ -121,6 +121,7 @@ const formatLabel = (date: Date, unit: string, isMainTick: boolean): string => {
 const calculateDatePosition = (date: Date, referenceDate: Date, scale: number): number => {
   const diffTime = date.getTime() - referenceDate.getTime()
   const diffDays = diffTime / (1000 * 60 * 60 * 24)
+  // Scale is always pixels per day
   return diffDays * scale
 }
 
@@ -145,7 +146,7 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
     const startPos = viewportLeftEdge - buffer
     const endPos = viewportRightEdge + buffer
     
-    // Convert positions to dates using the same calculation as the main timeline
+    // Convert positions to dates using continuous scale (pixels per day)
     const diffDays = startPos / scale
     const startDate = new Date(REFERENCE_DATE.getTime() + diffDays * 24 * 60 * 60 * 1000)
     

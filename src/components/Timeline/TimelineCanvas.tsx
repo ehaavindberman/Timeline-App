@@ -43,9 +43,9 @@ export const TimelineCanvas = () => {
   // Convert position to date based on reference date
   const positionToDate = useCallback(
     (xPos: number): Date => {
-      return positionToDateUtil(xPos, scale, zoomLevel)
+      return positionToDateUtil(xPos, scale)
     },
-    [scale, zoomLevel],
+    [scale],
   )
 
   // Determine zoom level based on scale
@@ -107,9 +107,9 @@ export const TimelineCanvas = () => {
   // Calculate date position based on reference date
   const calculateDatePosition = useCallback(
     (date: Date): number => {
-      return calculateDatePositionUtil(date, scale, zoomLevel)
+      return calculateDatePositionUtil(date, scale)
     },
-    [scale, zoomLevel],
+    [scale],
   )
 
   // Initialize the timeline position to center on DEFAULT_CENTER_DATE
@@ -259,18 +259,11 @@ export const TimelineCanvas = () => {
       setScale(newScale)
 
       // 5. Calculate the absolute X position of `dateUnderCenter` with the new scale
-      const newZoomLevel = getZoomLevelFromScale(newScale)
       const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime()
       const diffDays = diffTime / (1000 * 60 * 60 * 24)
 
-      let absoluteXForCenteredDateAtNewScale: number
-      if (newZoomLevel === ZoomLevel.Days) {
-        absoluteXForCenteredDateAtNewScale = diffDays * newScale
-      } else if (newZoomLevel === ZoomLevel.Months) {
-        absoluteXForCenteredDateAtNewScale = diffDays * (newScale / 5)
-      } else {
-        absoluteXForCenteredDateAtNewScale = diffDays * (newScale / 20)
-      }
+      // Simplified: scale is always pixels per day
+      const absoluteXForCenteredDateAtNewScale = diffDays * newScale
 
       // 6. Calculate the new scroll position to keep `dateUnderCenter` at `centerX`
       const newPosition = centerX - absoluteXForCenteredDateAtNewScale
@@ -319,14 +312,8 @@ export const TimelineCanvas = () => {
       const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime()
       const diffDays = diffTime / (1000 * 60 * 60 * 24)
       
-      let absoluteXForCenteredDateAtNewScale: number
-      if (newZoomLevel === ZoomLevel.Days) {
-        absoluteXForCenteredDateAtNewScale = diffDays * newScale
-      } else if (newZoomLevel === ZoomLevel.Months) {
-        absoluteXForCenteredDateAtNewScale = diffDays * (newScale / 5)
-      } else {
-        absoluteXForCenteredDateAtNewScale = diffDays * (newScale / 20)
-      }
+      // Simplified: scale is always pixels per day
+      const absoluteXForCenteredDateAtNewScale = diffDays * newScale
       
       const newPosition = centerX - absoluteXForCenteredDateAtNewScale
       setPosition(newPosition)
