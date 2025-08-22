@@ -18,6 +18,7 @@ import {
   calculateDatePosition as calculateDatePositionUtil,
   REFERENCE_DATE,
 } from "../../utils/timelineCalculations";
+import { getVisibleDateRange } from "../../utils/timelineViewport";
 
 // Default center date for initial view
 const DEFAULT_CENTER_DATE = new Date(2023, 4, 12); // April 12, 2023
@@ -42,48 +43,10 @@ export const TimelineCanvas = () => {
   );
 
   // Calculate the visible date range based on current position and canvas width
-  const getVisibleDateRange = useCallback(() => {
-    const fallbackWidth = 1200;
-    const canvasWidth = canvasRef.current?.clientWidth || fallbackWidth;
-    const buffer = Math.max(canvasWidth * 2, 2400);
-
-    // FIXED: Calculate the absolute timeline positions correctly
-    // position is the CSS transform offset, so we need to convert to absolute timeline coordinates
-    const viewportLeftEdge = -position; // Left edge of visible area in timeline coordinates
-    const viewportRightEdge = -position + canvasWidth; // Right edge of visible area
-
-    // Add buffer to get the range we need to generate segments for
-    const visibleStartX = viewportLeftEdge - buffer;
-    const visibleEndX = viewportRightEdge + buffer;
-
-    console.log("📍 FIXED getVisibleDateRange Debug:", {
-      position: Math.round(position),
-      canvasWidth,
-      buffer,
-      viewportLeftEdge: Math.round(viewportLeftEdge),
-      viewportRightEdge: Math.round(viewportRightEdge),
-      visibleStartX: Math.round(visibleStartX),
-      visibleEndX: Math.round(visibleEndX),
-      viewportCenter: Math.round(viewportLeftEdge + canvasWidth / 2),
-    });
-
-    const startDate = positionToDate(visibleStartX);
-    const endDate = positionToDate(visibleEndX);
-
-    // Verify the center calculation
-    const centerX = viewportLeftEdge + canvasWidth / 2;
-    const centerDate = positionToDate(centerX);
-
-    console.log("📅 Date Range Verification:", {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      centerX: Math.round(centerX),
-      centerDate: centerDate.toISOString(),
-      expectedCenter: "Should be around April 2023 initially",
-    });
-
-    return { startDate, endDate, canvasWidth, buffer };
-  }, [position, positionToDate, scale]);
+  const getVisibleDateRangeCallback = useCallback(() => {
+    const canvasWidth = canvasRef.current?.clientWidth || 1200;
+    return getVisibleDateRange(position, canvasWidth, scale);
+  }, [position, scale]);
 
   // Generate timeline segments based on visible range
 
@@ -171,6 +134,9 @@ export const TimelineCanvas = () => {
       x: 0,
     };
   }, [position, positionToDate]);
+
+  // Get current visible date range using the utility function
+  const { startDate, endDate } = getVisibleDateRangeCallback();
 
   // Handle double click to add event
   const handleDoubleClick = (e: React.MouseEvent) => {
