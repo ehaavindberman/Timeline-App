@@ -19,9 +19,6 @@ type RulerSegment = {
 }
 
 interface TimelineRulerProps {
-  zoomLevel: ZoomLevel
-  firstSegmentPosition: number
-  currentTimelineSegments: any[] // Legacy prop, not used in new implementation
   scale: number
   position?: number // Current scroll position from TimelineCanvas
 }
@@ -126,7 +123,6 @@ const calculateDatePosition = (date: Date, referenceDate: Date, scale: number): 
 }
 
 export const TimelineRuler: React.FC<TimelineRulerProps> = ({
-  firstSegmentPosition,
   scale,
   position = 0,
 }) => {

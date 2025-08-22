@@ -13,11 +13,9 @@ import { TimelineRuler } from "./TimelineRuler"
 import { TimelineRulerIndicators } from "./TimelineRulerIndicators"
 import { TimelineGuidelines } from "./TimelineGuidelines"
 import { useOffscreenElements } from "../../hooks/useOffscreenElements"
-import { generateTimelineSegments, ZoomLevel } from "../../utils/timelineSegments"
 import {
   positionToDate as positionToDateUtil,
   calculateDatePosition as calculateDatePositionUtil,
-  getZoomLevelFromScale as getZoomLevelFromScaleUtil,
   REFERENCE_DATE,
 } from "../../utils/timelineCalculations"
 
@@ -35,7 +33,6 @@ export const TimelineCanvas = () => {
   const [isDragging, setIsDragging] = useState(false)
   const [startDragX, setStartDragX] = useState(0)
   const [startPosition, setStartPosition] = useState(0)
-  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>(ZoomLevel.Years) // Start at year level
   const [isInitialized, setIsInitialized] = useState(false) // Track if initial positioning is done
 
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -48,14 +45,7 @@ export const TimelineCanvas = () => {
     [scale],
   )
 
-  // Determine zoom level based on scale
-  const getZoomLevelFromScale = useCallback((currentScale: number): ZoomLevel => {
-    return getZoomLevelFromScaleUtil(currentScale)
-  }, [])
-
-  useEffect(() => {
-    setZoomLevel(getZoomLevelFromScale(scale))
-  }, [scale, getZoomLevelFromScale])
+  
 
   // Calculate the visible date range based on current position and canvas width
   const getVisibleDateRange = useCallback(() => {
@@ -99,7 +89,7 @@ export const TimelineCanvas = () => {
     })
 
     return { startDate, endDate, canvasWidth, buffer }
-  }, [position, positionToDate, scale, zoomLevel])
+  }, [position, positionToDate, scale])
 
   // Generate timeline segments based on visible range
 
@@ -137,44 +127,14 @@ export const TimelineCanvas = () => {
     }
   }, [calculateDatePosition, isInitialized])
 
-  // Get current timeline segments based on visible range
-  const { startDate, endDate } = getVisibleDateRange()
-  const currentTimelineSegments = useMemo(
-    () => generateTimelineSegments(scale, zoomLevel, startDate, endDate),
-    [scale, zoomLevel, startDate, endDate],
-  )
+  
 
-  // Calculate the position of the first segment for rendering
-  const firstSegmentPosition = useMemo(() => {
-    if (currentTimelineSegments.length === 0) return 0
-    const firstSegmentDate = currentTimelineSegments[0].date
-    const segmentPosition = calculateDatePosition(firstSegmentDate)
-
-    console.log("🎯 First Segment Positioning:", {
-      firstSegmentDate: firstSegmentDate.toISOString(),
-      firstSegmentPosition: Math.round(segmentPosition),
-      currentPosition: Math.round(position),
-      viewportCenter: Math.round(-position + (canvasRef.current?.clientWidth || 1200) / 2),
-      centerDate: positionToDate(-position + (canvasRef.current?.clientWidth || 1200) / 2).toISOString(),
-    })
-
-    return segmentPosition
-  }, [currentTimelineSegments, calculateDatePosition, position, positionToDate])
-
-  // Snap x position to nearest day/month/year depending on zoom level
+  // Snap x position to nearest day based on scale
   const snapToGrid = useCallback(
     (xPos: number): number => {
-      if (zoomLevel === ZoomLevel.Days) {
-        return Math.round(xPos / scale) * scale
-      } else if (zoomLevel === ZoomLevel.Months) {
-        const monthScale = scale / 5
-        return Math.round(xPos / monthScale) * monthScale
-      } else {
-        const yearScale = scale / 20
-        return Math.round(xPos / yearScale) * yearScale
-      }
+      return Math.round(xPos / scale) * scale
     },
-    [scale, zoomLevel],
+    [scale],
   )
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -285,28 +245,23 @@ export const TimelineCanvas = () => {
       
       // Set the appropriate scale for each zoom level
       let newScale: number
-      let newZoomLevel: ZoomLevel
       
       switch (level) {
         case 'day':
           newScale = 100 // High scale for day view
-          newZoomLevel = ZoomLevel.Days
           break
         case 'month':
           newScale = 20 // Medium scale for month view  
-          newZoomLevel = ZoomLevel.Months
           break
         case 'year':
           newScale = 5 // Low scale for year view
-          newZoomLevel = ZoomLevel.Years
           break
         default:
           return
       }
       
-      // Update scale and zoom level
+      // Update scale
       setScale(newScale)
-      setZoomLevel(newZoomLevel)
       
       // Calculate new position to keep the same date centered
       const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime()
@@ -357,7 +312,6 @@ export const TimelineCanvas = () => {
     ;(window as any).timelineConfig = {
       scale,
       referenceDate: REFERENCE_DATE,
-      zoomLevel,
       positionToDate: positionToDate,
       calculateDatePosition: calculateDatePosition,
       centerOnElement,
@@ -366,7 +320,6 @@ export const TimelineCanvas = () => {
     }
   }, [
     scale,
-    zoomLevel,
     positionToDate,
     calculateDatePosition,
     centerOnElement,
@@ -382,7 +335,6 @@ export const TimelineCanvas = () => {
     canvasRef,
     calculateDatePosition,
     scale,
-    zoomLevel,
   })
 
   // Render the appropriate timeline ruler based on zoom level
@@ -421,9 +373,6 @@ export const TimelineCanvas = () => {
           {/* Timeline ruler */}
           <div className="sticky top-0 z-10 h-16 bg-white border-b border-slate-200 select-none">
             <TimelineRuler
-              zoomLevel={zoomLevel}
-              firstSegmentPosition={firstSegmentPosition}
-              currentTimelineSegments={currentTimelineSegments}
               scale={scale}
               position={position}
             />
@@ -438,12 +387,7 @@ export const TimelineCanvas = () => {
           />
           {/* Timeline content */}
           <div className="relative h-[calc(100%-4rem)] pt-8 select-none">
-            {/* Guidelines - dynamically generated based on visible segments */}
-            <TimelineGuidelines
-              zoomLevel={zoomLevel}
-              currentTimelineSegments={currentTimelineSegments}
-              firstSegmentPosition={firstSegmentPosition}
-            />
+            {/* Guidelines - will be added back with scale-based logic later */}
 
             {/* Time spans (z-index 20, selected: 30) */}
             {spans.map((span) => (
@@ -451,7 +395,6 @@ export const TimelineCanvas = () => {
                 key={span.id}
                 span={span}
                 calculateDatePosition={calculateDatePosition}
-                zoomLevel={zoomLevel}
               />
             ))}
             {/* Events (z-index 20, selected: 30) */}
@@ -460,7 +403,6 @@ export const TimelineCanvas = () => {
                 key={event.id}
                 event={event}
                 calculateDatePosition={calculateDatePosition}
-                zoomLevel={zoomLevel}
               />
             ))}
           </div>
