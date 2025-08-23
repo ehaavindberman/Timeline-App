@@ -72,15 +72,6 @@ export const TimelineCanvas = () => {
       const initialPosition = centerX - centerDatePosition;
       setPosition(initialPosition);
       setIsInitialized(true);
-
-      console.log("🎯 Initial Positioning:", {
-        canvasWidth,
-        centerX,
-        defaultCenterDate: DEFAULT_CENTER_DATE.toISOString(),
-        centerDatePosition: Math.round(centerDatePosition),
-        initialPosition: Math.round(initialPosition),
-        verification: "Center should be at DEFAULT_CENTER_DATE",
-      });
     }
   }, [calculateDatePosition, isInitialized]);
 

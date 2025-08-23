@@ -35,31 +35,12 @@ export const getVisibleDateRange = (
   const visibleStartX = viewportLeftEdge - buffer
   const visibleEndX = viewportRightEdge + buffer
 
-  console.log("📍 FIXED getVisibleDateRange Debug:", {
-    position: Math.round(position),
-    canvasWidth: actualCanvasWidth,
-    buffer,
-    viewportLeftEdge: Math.round(viewportLeftEdge),
-    viewportRightEdge: Math.round(viewportRightEdge),
-    visibleStartX: Math.round(visibleStartX),
-    visibleEndX: Math.round(visibleEndX),
-    viewportCenter: Math.round(viewportLeftEdge + actualCanvasWidth / 2),
-  })
-
   const startDate = positionToDateUtil(visibleStartX, scale)
   const endDate = positionToDateUtil(visibleEndX, scale)
 
   // Verify the center calculation
   const centerX = viewportLeftEdge + actualCanvasWidth / 2
   const centerDate = positionToDateUtil(centerX, scale)
-
-  console.log("📅 Date Range Verification:", {
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    centerX: Math.round(centerX),
-    centerDate: centerDate.toISOString(),
-    expectedCenter: "Should be around April 2023 initially",
-  })
 
   return { 
     startDate, 

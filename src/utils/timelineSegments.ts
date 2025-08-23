@@ -131,19 +131,9 @@ export const generateTimelineSegments = (
   startDate: Date,
   endDate: Date
 ): TimelineSegment[] => {
-  console.group(`🔍 generateTimelineSegments Debug`)
-  console.log("📊 Input Parameters:", {
-    currentScale,
-    scaleLevel: currentScale >= 50 ? 'Days' : currentScale >= 5 ? 'Months' : 'Years',
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    dateRange: `${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
-  })
 
   const segments: TimelineSegment[] = []
   const pixelsPerDay = currentScale
-
-  console.log("📐 Pixels per day:", pixelsPerDay)
 
   if (currentScale >= 50) {
     // High scale - Generate months with days
@@ -171,7 +161,6 @@ export const generateTimelineSegments = (
       segmentIndex++
     }
 
-    console.log(`✅ Days Level - Generated ${segments.length} month segments`)
   } else if (currentScale >= 5) {
     // Medium scale - Generate years with months
     let currentDate = startOfYear(new Date(startDate.getTime() - 2 * 365 * 24 * 60 * 60 * 1000))
@@ -214,7 +203,6 @@ export const generateTimelineSegments = (
       segmentIndex++
     }
 
-    console.log(`✅ Months Level - Generated ${segments.length} year segments`)
   } else {
     // Low scale - Generate years
     let currentDate = startOfYear(new Date(startDate.getTime() - 10 * 365 * 24 * 60 * 60 * 1000))
@@ -239,8 +227,6 @@ export const generateTimelineSegments = (
       currentDate = addYears(currentDate, 1)
       segmentIndex++
     }
-
-    console.log(`✅ Years Level - Generated ${segments.length} year segments`)
   }
 
   console.groupEnd()
