@@ -295,8 +295,6 @@ export const TimelineCanvas = () => {
     scale,
   });
 
-  // Render the appropriate timeline ruler based on zoom level
-
   return (
     <div className="relative flex-1 overflow-hidden bg-white select-none">
       <TimelineControls
