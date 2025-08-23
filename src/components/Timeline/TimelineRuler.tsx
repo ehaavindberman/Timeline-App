@@ -18,7 +18,8 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
   const visibleRange = useMemo(() => {
     // Estimate canvas width (this could be passed as prop in the future)
     const canvasWidth = 1200
-    return getVisibleDateRange(-position, canvasWidth, scale)
+    // Use the position directly - it represents the visible area offset
+    return getVisibleDateRange(position, canvasWidth, scale)
   }, [position, scale])
   
   // Generate ruler segments based on current scale
@@ -43,12 +44,15 @@ export const TimelineRuler: React.FC<TimelineRulerProps> = ({
         const textSize = segment.isMainTick ? 'text-sm font-medium' : 'text-xs'
         const textColor = segment.isMainTick ? 'text-slate-700' : 'text-slate-500'
         
+        // Adjust position to account for the current scroll offset
+        const adjustedPosition = segment.position + position
+        
         return (
           <div
             key={`${segment.date.getTime()}-${index}`}
             className="absolute bottom-0 flex flex-col items-center select-none"
             style={{
-              left: `${segment.position}px`,
+              left: `${adjustedPosition}px`,
               transform: 'translateX(-50%)'
             }}
           >

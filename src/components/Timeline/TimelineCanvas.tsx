@@ -307,6 +307,7 @@ export const TimelineCanvas = () => {
         offscreenElements={offscreenElements}
         onCenterElement={centerOnElement}
       />
+      
       <div
         id="timeline-canvas"
         ref={canvasRef}
@@ -320,8 +321,33 @@ export const TimelineCanvas = () => {
           cursor: isDragging ? "grabbing" : "grab",
         }}
       >
+        {/* Fixed ruler that stays at the top but shows correct content */}
+        <div className="sticky top-0 z-10 h-16 bg-white border-b border-slate-200 select-none">
+          <TimelineRuler 
+            scale={scale} 
+            position={position} // Pass negative position to show visible area correctly
+          />
+          {/* Timeline ruler indicators - positioned at bottom of ruler and moved with canvas */}
+          <div
+            style={{
+              transform: `translateX(${position}px)`,
+              transition: isDragging
+                ? "none"
+                : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            }}
+          >
+            <TimelineRulerIndicators
+              events={events}
+              spans={spans}
+              calculateDatePosition={calculateDatePosition}
+              position={position}
+              canvasWidth={canvasRef.current?.clientWidth || 1200}
+            />
+          </div>
+        </div>
+        
         <div
-          className="relative h-full select-none"
+          className="relative h-[calc(100%-4rem)] select-none"
           style={{
             width: "100%",
             transform: `translateX(${position}px)`,
@@ -330,20 +356,8 @@ export const TimelineCanvas = () => {
               : "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
-          {/* Timeline ruler */}
-          <div className="sticky top-0 z-10 h-16 bg-white border-b border-slate-200 select-none">
-            <TimelineRuler scale={scale} position={position} />
-          </div>
-          {/* Timeline ruler indicators */}
-          <TimelineRulerIndicators
-            events={events}
-            spans={spans}
-            calculateDatePosition={calculateDatePosition}
-            position={position}
-            canvasWidth={canvasRef.current?.clientWidth || 1200}
-          />
           {/* Timeline content */}
-          <div className="relative h-[calc(100%-4rem)] pt-8 select-none">
+          <div className="relative h-full pt-8 select-none">
             {/* Guidelines - will be added back with scale-based logic later */}
             <TimelineGuidelines
               scale={scale}
@@ -372,4 +386,4 @@ export const TimelineCanvas = () => {
       </div>
     </div>
   );
-};
+}

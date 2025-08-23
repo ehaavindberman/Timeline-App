@@ -19,7 +19,7 @@ export const TimelineRulerIndicators: React.FC<TimelineRulerIndicatorsProps> = (
   canvasWidth,
 }) => {
   return (
-    <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-20">
+    <div className="absolute bottom-0 left-0 w-full h-4 pointer-events-none z-20">
       {/* Event indicators */}
       <TimelineEventIndicators
         events={events}
