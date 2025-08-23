@@ -290,7 +290,7 @@ export const TimelineCanvas = () => {
     events,
     spans,
     position,
-    canvasRef,
+    canvasWidth: canvasRef.current?.clientWidth || 1200,
     calculateDatePosition,
     scale,
   });

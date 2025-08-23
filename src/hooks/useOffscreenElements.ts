@@ -6,7 +6,7 @@ interface UseOffscreenElementsProps {
   events: TimelineEvent[]
   spans: TimelineSpan[]
   position: number
-  canvasRef: React.RefObject<HTMLDivElement>
+  canvasWidth: number
   calculateDatePosition: (date: Date) => number
   scale: number
 }
@@ -29,14 +29,12 @@ export const useOffscreenElements = ({
   events,
   spans,
   position,
-  canvasRef,
+  canvasWidth,
   calculateDatePosition,
   scale,
 }: UseOffscreenElementsProps): OffscreenElementsResult => {
   return useMemo(() => {
-    if (!canvasRef.current) return { left: [], right: [] }
 
-    const canvasWidth = canvasRef.current.clientWidth
     const viewportLeft = -position
     const viewportRight = viewportLeft + canvasWidth
     const leftElements: OffscreenElement[] = []
@@ -106,5 +104,5 @@ export const useOffscreenElements = ({
       left: leftElements.sort((a, b) => a.distance - b.distance),
       right: rightElements.sort((a, b) => a.distance - b.distance)
     }
-  }, [events, spans, position, canvasRef, calculateDatePosition, scale])
+  }, [events, spans, position, canvasWidth, calculateDatePosition, scale])
 }
