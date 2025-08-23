@@ -35,6 +35,7 @@ export interface RulerSegment {
   date: Date
   label: string
   position: number
+  width: number
   isMainTick: boolean
   tickHeight: 'small' | 'medium' | 'large'
 }
@@ -286,14 +287,19 @@ export const generateRulerSegments = (
   // Generate major ticks
   while (currentDate <= endDate) {
     const tickPosition = calculateDatePosition(currentDate, REFERENCE_DATE, scale)
+    const nextDate = addTime(currentDate, intervals.major.unit, intervals.major.step)
+    const nextPosition = calculateDatePosition(nextDate, REFERENCE_DATE, scale)
+    const width = nextPosition - tickPosition
+    
     segments.push({
       date: new Date(currentDate),
       label: formatLabel(currentDate, intervals.major.unit, true),
       position: tickPosition,
+      width: width,
       isMainTick: true,
       tickHeight: 'large'
     })
-    currentDate = addTime(currentDate, intervals.major.unit, intervals.major.step)
+    currentDate = nextDate
   }
   
   // Generate minor ticks
@@ -331,10 +337,15 @@ export const generateRulerSegments = (
     )
     
     if (!isAlreadyMajor) {
+      const nextMinorDate = addTime(currentDate, intervals.minor.unit, intervals.minor.step)
+      const nextMinorPosition = calculateDatePosition(nextMinorDate, REFERENCE_DATE, scale)
+      const minorWidth = nextMinorPosition - tickPosition
+      
       segments.push({
         date: new Date(currentDate),
         label: formatLabel(currentDate, intervals.minor.unit, false),
         position: tickPosition,
+        width: minorWidth,
         isMainTick: false,
         tickHeight: 'medium'
       })
