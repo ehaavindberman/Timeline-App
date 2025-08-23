@@ -188,64 +188,6 @@ export const TimelineCanvas = () => {
     }
   };
 
-  // Zoom preset methods
-  const setPresetZoom = useCallback(
-    (level: "day" | "month" | "year") => {
-      if (canvasRef.current) {
-        const currentCanvasWidth = canvasRef.current.clientWidth;
-        const centerX = currentCanvasWidth / 2;
-
-        // Get the date currently at the center
-        const absoluteXAtCurrentCenter = -position + centerX;
-        const dateUnderCenter = positionToDate(absoluteXAtCurrentCenter);
-
-        // Set the appropriate scale for each zoom level
-        let newScale: number;
-
-        switch (level) {
-          case "day":
-            newScale = 100; // High scale for day view
-            break;
-          case "month":
-            newScale = 20; // Medium scale for month view
-            break;
-          case "year":
-            newScale = 5; // Low scale for year view
-            break;
-          default:
-            return;
-        }
-
-        // Update scale
-        setScale(newScale);
-
-        // Calculate new position to keep the same date centered
-        const diffTime = dateUnderCenter.getTime() - REFERENCE_DATE.getTime();
-        const diffDays = diffTime / (1000 * 60 * 60 * 24);
-
-        // Simplified: scale is always pixels per day
-        const absoluteXForCenteredDateAtNewScale = diffDays * newScale;
-
-        const newPosition = centerX - absoluteXForCenteredDateAtNewScale;
-        setPosition(newPosition);
-      }
-    },
-    [position, positionToDate],
-  );
-
-  // Expose timeline methods globally for toolbar access
-  useEffect(() => {
-    (window as any).timelineConfig = {
-      setPresetZoom,
-      getCurrentViewportCenter,
-      calculateDatePosition,
-    };
-
-    return () => {
-      delete (window as any).timelineConfig;
-    };
-  }, [setPresetZoom, getCurrentViewportCenter, calculateDatePosition]);
-
   // Center on a specific element by ID
   const centerOnElement = useCallback(
     (elementId: string) => {
@@ -264,26 +206,6 @@ export const TimelineCanvas = () => {
     },
     [events, spans, calculateDatePosition, selectElement],
   );
-
-  // Add to global window so other components can access it
-  useEffect(() => {
-    (window as any).timelineConfig = {
-      scale,
-      referenceDate: REFERENCE_DATE,
-      positionToDate: positionToDate,
-      calculateDatePosition: calculateDatePosition,
-      centerOnElement,
-      setPresetZoom,
-      getCurrentViewportCenter,
-    };
-  }, [
-    scale,
-    positionToDate,
-    calculateDatePosition,
-    centerOnElement,
-    setPresetZoom,
-    getCurrentViewportCenter,
-  ]);
 
   // Calculate off-screen elements using custom hook
   const offscreenElements = useOffscreenElements({
