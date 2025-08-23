@@ -48,7 +48,8 @@ export const TimelineCanvas = () => {
     return getVisibleDateRange(position, canvasWidth, scale);
   }, [position, scale]);
 
-  // Generate timeline segments based on visible range
+  // Get current visible date range using the utility function
+  const { startDate, endDate } = getVisibleDateRangeCallback();
 
   // Calculate date position based on reference date
   const calculateDatePosition = useCallback(
@@ -134,9 +135,6 @@ export const TimelineCanvas = () => {
       x: 0,
     };
   }, [position, positionToDate]);
-
-  // Get current visible date range using the utility function
-  const { startDate, endDate } = getVisibleDateRangeCallback();
 
   // Handle double click to add event
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -349,6 +347,11 @@ export const TimelineCanvas = () => {
           {/* Timeline content */}
           <div className="relative h-[calc(100%-4rem)] pt-8 select-none">
             {/* Guidelines - will be added back with scale-based logic later */}
+            <TimelineGuidelines
+              scale={scale}
+              startDate={startDate}
+              endDate={endDate}
+            />
 
             {/* Time spans (z-index 20, selected: 30) */}
             {spans.map((span) => (
